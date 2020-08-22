@@ -12,11 +12,16 @@ enum Token {
 }
 
 fn parse_int(s: &str) -> IResult<&str, f64> {
-    let (s, int) = digit1(s)?;
-    if let Ok(int) = int.parse::<f64>() {
-        Ok((s, int))
-    } else {
-        Err(Err::Failure((s, ErrorKind::Digit)))
+    match digit1::<&str, (&str, ErrorKind)>(s) {
+        Ok((s, "")) => Err(Err::Failure((s, ErrorKind::Digit))),
+        Ok((s, int)) => {
+            if let Ok(int) = int.parse::<f64>() {
+                Ok((s, int))
+            } else {
+                Err(Err::Failure((s, ErrorKind::Digit)))
+            }
+        }
+        err => Err(Err::Failure((s, ErrorKind::Digit))),
     }
 }
 
@@ -27,16 +32,16 @@ fn parse_fract(s: &str) -> IResult<&str, f64> {
 }
 
 fn parse_float(s: &str) -> IResult<&str, Token> {
-    let (s, sign) = opt(one_of("+-"))(s)?;
-    let sign: f64 = if sign.unwrap_or('+') == '+' {
-        1.0
-    } else {
-        -1.0
-    };
+    let (s, sign) = opt(char('-'))(s)?;
+    let sign: f64 = if let None = sign { 1.0 } else { -1.0 };
+
+    if s == "" {
+        return Err(Err::Failure((s, ErrorKind::Eof)));
+    }
 
     let (s, int) = match parse_int(s) {
         Ok((s, int)) => (s, int),
-        err => (s, 0.0),
+        err => return Err(Err::Failure((s, ErrorKind::Digit))),
     };
 
     match opt(parse_fract)(s) {
@@ -48,7 +53,7 @@ fn parse_float(s: &str) -> IResult<&str, Token> {
             let float = int.copysign(sign);
             Ok((s, Token::Float(float)))
         }
-        err => Err(Err::Failure((s, ErrorKind::Float))),
+        _err => Err(Err::Failure((s, ErrorKind::Float))),
     }
 }
 
@@ -78,21 +83,37 @@ mod test {
         }
     }
 
+    fn test_parse_fn_with_error(parse_fn: &ParseFn, input: &str) {
+        if let Ok(("", result)) = parse_fn(input) {
+            assert!(false);
+        } else {
+            assert!(true);
+        }
+    }
+
+    #[test]
+    fn test_parse_float_for_empty() {
+        test_parse_fn_with_error(&parse_float, "");
+    }
+
+    #[test]
+    fn test_invalid_float() {
+        test_parse_fn_with_error(&parse_float, ".0");
+        test_parse_fn_with_error(&parse_float, "-.0");
+        test_parse_fn_with_error(&parse_float, ".012");
+    }
+
     #[test]
     fn test_parse_float() {
         test_parse_fn(&parse_float, Token::Float(0.0), "0");
         test_parse_fn(&parse_float, Token::Float(0.0), "0.0");
         test_parse_fn(&parse_float, Token::Float(0.0), "-0");
-        test_parse_fn(&parse_float, Token::Float(0.0), "-.0");
 
         test_parse_fn(&parse_float, Token::Float(1.0), "1");
         test_parse_fn(&parse_float, Token::Float(123.0), "123");
 
         test_parse_fn(&parse_float, Token::Float(123.0), "123.0");
         test_parse_fn(&parse_float, Token::Float(123.012), "123.012");
-
-        test_parse_fn(&parse_float, Token::Float(0.0), ".0");
-        test_parse_fn(&parse_float, Token::Float(0.012), ".012");
 
         test_parse_fn(&parse_float, Token::Float(-1.0), "-1");
         test_parse_fn(&parse_float, Token::Float(-1.0), "-1.0");
