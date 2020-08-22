@@ -7,8 +7,20 @@ use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq)]
-enum Token {
+enum Token<'a> {
     Float(f64),
+    Keyword(&'a str),
+    BinaryOp(&'a str),
+    // Identifier(&'a str),
+    // String(&'a str),
+    // OpenParen,
+    // CloseParen,
+    // OpenBracket,
+    // CloseBracket,
+    // OpenBrace,
+    // CloseBrace,
+    // AtMark,
+    // Equal,
 }
 
 fn parse_int(s: &str) -> IResult<&str, f64> {
