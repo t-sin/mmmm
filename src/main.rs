@@ -6,8 +6,8 @@ use nom::combinator::{all_consuming, opt};
 use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
-#[derive(Debug)]
 enum AST {
+#[derive(Debug, PartialEq)]
     Float(f64),
 }
 
@@ -63,5 +63,38 @@ fn main() {
     }
 }
 
+#[cfg(test)]
+mod test {
+    use super::*;
+
+    type ParseFn = dyn Fn(&str) -> IResult<&str, AST>;
+
+    fn test_parse_fn(parse_fn: &ParseFn, expected: AST, input: &str) {
+        if let Ok(("", result)) = parse_fn(input) {
+            assert_eq!(expected, result);
+        } else {
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn test_parse_float() {
+        test_parse_fn(&parse_float, AST::Float(0.0), "0");
+        test_parse_fn(&parse_float, AST::Float(0.0), "0.0");
+        test_parse_fn(&parse_float, AST::Float(0.0), "-0");
+        test_parse_fn(&parse_float, AST::Float(0.0), "-.0");
+
+        test_parse_fn(&parse_float, AST::Float(1.0), "1");
+        test_parse_fn(&parse_float, AST::Float(123.0), "123");
+
+        test_parse_fn(&parse_float, AST::Float(123.0), "123.0");
+        test_parse_fn(&parse_float, AST::Float(123.012), "123.012");
+
+        test_parse_fn(&parse_float, AST::Float(0.0), ".0");
+        test_parse_fn(&parse_float, AST::Float(0.012), ".012");
+
+        test_parse_fn(&parse_float, AST::Float(-1.0), "-1");
+        test_parse_fn(&parse_float, AST::Float(-1.0), "-1.0");
+        test_parse_fn(&parse_float, AST::Float(-127.0), "-127");
     }
 }
