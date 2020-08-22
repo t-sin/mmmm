@@ -57,9 +57,11 @@ fn parse(s: &str) -> IResult<&str, AST> {
 
 fn main() {
     let input = "-123.0";
-    if let Ok((s, n)) = parse(input) {
-        println!("{:?}, {:?}", s, n);
-    } else {
-        panic!("parse error!");
+    match parse(input) {
+        Ok((_, n)) => println!("parsed: {:?}", n),
+        err => panic!("parse error: {:?}", err),
+    }
+}
+
     }
 }
