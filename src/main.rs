@@ -1,9 +1,10 @@
 extern crate nom;
 
-use nom::branch::permutation;
-use nom::character::complete::{char, digit1, one_of};
+use nom::branch::{alt, permutation};
+use nom::bytes::complete::tag;
+use nom::character::complete::{char, digit1, multispace0};
 use nom::combinator::{all_consuming, opt};
-use nom::error::ErrorKind;
+use nom::error::{ErrorKind, VerboseErrorKind};
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq)]
@@ -69,14 +70,73 @@ fn parse_float(s: &str) -> IResult<&str, Token> {
     }
 }
 
+fn parse_keyword(s: &str) -> IResult<&str, Token> {
+    let (s, name) = alt((
+        tag("fn"),
+        tag("return"),
+        tag("if"),
+        tag("else"),
+        tag("float"),
+        tag("void"),
+        tag("now"),
+    ))(s)?;
+    Ok((s, Token::Keyword(name)))
+}
+
+fn parse_binop(s: &str) -> IResult<&str, Token> {
+    // let (s, op) = alt((
+    //     tag("+"),
+    //     tag("-"),
+    //     tag("*"),
+    //     tag("/"),
+    //     tag("%"),
+    //     tag("<"),
+    //     tag(">"),
+    //     tag("<="),
+    //     tag(">="),
+    //     tag("=="),
+    // ))(s)?;
+    let (s, op) = tag("+")(s)?;
+    Ok((s, Token::BinaryOp(op)))
+}
+
+fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
+    let mut tokens = Vec::new();
+    let mut input = s;
+
+    loop {
+        println!("input1: {:?}", input);
+        match multispace0::<&str, (&str, ErrorKind)>(input) {
+            Ok((s, _)) => input = s,
+            _ => (),
+        }
+
+        println!("input2: {:?}", input);
+        match alt((parse_float, parse_binop, parse_keyword))(input) {
+            Ok(("", token)) => {
+                input = "";
+                tokens.push(token);
+                break;
+            }
+            Ok((s, token)) => {
+                input = s;
+                tokens.push(token);
+            }
+            Err(e) => return Err(e),
+        }
+    }
+
+    Ok((input, tokens))
+}
+
 fn parse(s: &str) -> IResult<&str, Token> {
     all_consuming(parse_float)(s)
 }
 
 fn main() {
-    let input = "-123.0";
-    match parse(input) {
-        Ok((_, n)) => println!("parsed: {:?}", n),
+    let input = "-123.0 + 456.7";
+    match parse_tokens(input) {
+        Ok((_, tokens)) => println!("parsed: {:?}", tokens),
         err => panic!("parse error: {:?}", err),
     }
 }
@@ -130,5 +190,33 @@ mod test {
         test_parse_fn(&parse_float, Token::Float(-1.0), "-1");
         test_parse_fn(&parse_float, Token::Float(-1.0), "-1.0");
         test_parse_fn(&parse_float, Token::Float(-127.0), "-127");
+    }
+
+    #[test]
+    fn test_parse_binop() {
+        test_parse_fn(&parse_float, Token::BinaryOp("+"), "+");
+    }
+
+    fn test_parse_tokens_1(expected: Vec<Token>, input: &str) {
+        if let Ok(("", result)) = parse_tokens(input) {
+            assert_eq!(expected, result);
+        } else {
+            assert!(false);
+        }
+    }
+
+    //    #[test]
+    fn test_parse_tokens() {
+        test_parse_tokens_1(vec![Token::Float(-127.0)], "-127");
+        test_parse_tokens_1(vec![Token::Float(-127.0), Token::Float(127.0)], "-127 127");
+        test_parse_tokens_1(
+            vec![
+                Token::Float(-127.0),
+                Token::Float(127.0),
+                Token::Keyword("now"),
+                Token::Float(0.0),
+            ],
+            "-127 127 now 0",
+        );
     }
 }
