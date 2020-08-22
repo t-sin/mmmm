@@ -22,11 +22,8 @@ fn parse_int(s: &str) -> IResult<&str, f64> {
 
 fn parse_fract(s: &str) -> IResult<&str, f64> {
     let (s, (_, frac)) = permutation((char('.'), digit1))(s)?;
-    if let Ok(frac) = frac.parse::<f64>() {
-        Ok((s, frac))
-    } else {
-        Err(Err::Failure((s, ErrorKind::Digit)))
-    }
+    let frac = frac.parse::<f64>().unwrap() / 10f64.powf(frac.len() as f64);
+    Ok((s, frac))
 }
 
 fn parse_float(s: &str) -> IResult<&str, AST> {
@@ -37,14 +34,18 @@ fn parse_float(s: &str) -> IResult<&str, AST> {
         -1.0
     };
 
-    let (s, int) = parse_int(s)?;
+    let (s, int) = match parse_int(s) {
+        Ok((s, int)) => (s, int),
+        err => (s, 0.0),
+    };
+
     match opt(parse_fract)(s) {
         Ok((s, Some(frac))) => {
-            let float = (int + frac) * sign;
+            let float = (int + frac).copysign(sign);
             Ok((s, AST::Float(float)))
         }
         Ok((s, None)) => {
-            let float = int * sign;
+            let float = int.copysign(sign);
             Ok((s, AST::Float(float)))
         }
         err => Err(Err::Failure((s, ErrorKind::Float))),
