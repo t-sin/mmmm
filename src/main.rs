@@ -2,10 +2,10 @@ extern crate nom;
 
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
-use nom::character::complete::{char, digit1, multispace0, none_of};
+use nom::character::complete::{char, digit1, multispace0, none_of, one_of};
 use nom::combinator::{all_consuming, opt};
 use nom::error::ErrorKind;
-use nom::multi::many1;
+use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 use nom::{Err, IResult};
 
@@ -14,7 +14,7 @@ enum Token<'a> {
     Float(f64),
     Keyword(&'a str),
     BinaryOp(&'a str),
-    // Identifier(&'a str),
+    Identifier(String),
     String(String),
     OpenParen,
     CloseParen,
@@ -22,8 +22,9 @@ enum Token<'a> {
     CloseBracket,
     OpenBrace,
     CloseBrace,
-    TimeAt,
+    FnReturnType,
     Assign,
+    TimeAt,
 }
 
 fn parse_int(s: &str) -> IResult<&str, f64> {
@@ -110,6 +111,11 @@ fn parse_time_at(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::TimeAt))
 }
 
+fn parse_fn_return_type(s: &str) -> IResult<&str, Token> {
+    let (s, _) = tag("->")(s)?;
+    Ok((s, Token::FnReturnType))
+}
+
 fn parse_string(s: &str) -> IResult<&str, Token> {
     let (s, (_, string, _)) = tuple((char('"'), many1(none_of("\"")), char('"')))(s)?;
     let string: String = string.iter().collect();
@@ -137,6 +143,23 @@ fn parse_parens(s: &str) -> IResult<&str, Token> {
     Ok((s, token))
 }
 
+fn parse_identifier(s: &str) -> IResult<&str, Token> {
+    let digits = "0123456789";
+    let alpha = "abcdefghijklmnopqrstuvwxyz";
+    let alpha_cap = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+    let underbar = "_";
+    let first_chars = [alpha, alpha_cap, underbar].concat();
+    let rest_chars = [digits, alpha, alpha_cap, underbar].concat();
+
+    let (s, (first, rest)) = permutation((
+        many1(one_of(&first_chars[..])),
+        many0(one_of(&rest_chars[..])),
+    ))(s)?;
+    let first: String = first.into_iter().collect();
+    let rest: String = rest.into_iter().collect();
+    Ok((s, Token::Identifier([first, rest].concat())))
+}
+
 fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
     let mut tokens = Vec::new();
     let mut input = s;
@@ -147,12 +170,14 @@ fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
 
         let (s, token) = alt((
             parse_float,
+            parse_fn_return_type,
             parse_binop,
             parse_keyword,
             parse_parens,
             parse_string,
             parse_assignment,
             parse_time_at,
+            parse_identifier,
         ))(input)?;
         input = s;
         tokens.push(token);
@@ -302,6 +327,25 @@ mod test {
                 Token::String("123".to_string()),
             ],
             "\"abc\" + \"123\"",
+        );
+
+        test_parse_tokens_1(
+            vec![
+                Token::Keyword("fn"),
+                Token::Identifier("func".to_string()),
+                Token::OpenParen,
+                Token::CloseParen,
+                Token::FnReturnType,
+                Token::Keyword("void"),
+                Token::OpenBrace,
+                Token::Keyword("return"),
+                Token::Identifier("array".to_string()),
+                Token::OpenBracket,
+                Token::Float(0.0),
+                Token::CloseBracket,
+                Token::CloseBrace,
+            ],
+            "fn func() -> void { return array[0]}",
         );
     }
 }
