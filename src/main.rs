@@ -168,6 +168,10 @@ fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
         let (s, _) = opt(multispace0::<&str, (&str, ErrorKind)>)(input)?;
         input = s;
 
+        if s == "" {
+            break;
+        }
+
         let (s, token) = alt((
             parse_float,
             parse_fn_return_type,
@@ -181,9 +185,6 @@ fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
         ))(input)?;
         input = s;
         tokens.push(token);
-        if s == "" {
-            break;
-        }
     }
 
     Ok((input, tokens))
