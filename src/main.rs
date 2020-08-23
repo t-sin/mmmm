@@ -26,15 +26,15 @@ enum Token<'a> {
 
 fn parse_int(s: &str) -> IResult<&str, f64> {
     match digit1::<&str, (&str, ErrorKind)>(s) {
-        Ok((s, "")) => Err(Err::Failure((s, ErrorKind::Digit))),
+        Ok((s, "")) => Err(Err::Error((s, ErrorKind::Digit))),
         Ok((s, int)) => {
             if let Ok(int) = int.parse::<f64>() {
                 Ok((s, int))
             } else {
-                Err(Err::Failure((s, ErrorKind::Digit)))
+                Err(Err::Error((s, ErrorKind::Digit)))
             }
         }
-        _ => Err(Err::Failure((s, ErrorKind::Digit))),
+        _ => Err(Err::Error((s, ErrorKind::Digit))),
     }
 }
 
@@ -49,12 +49,12 @@ fn parse_float(s: &str) -> IResult<&str, Token> {
     let sign: f64 = if let None = sign { 1.0 } else { -1.0 };
 
     if s == "" {
-        return Err(Err::Failure((s, ErrorKind::Eof)));
+        return Err(Err::Error((s, ErrorKind::Eof)));
     }
 
     let (s, int) = match parse_int(s) {
         Ok((s, int)) => (s, int),
-        _ => return Err(Err::Failure((s, ErrorKind::Digit))),
+        _ => return Err(Err::Error((s, ErrorKind::Digit))),
     };
     match opt(parse_fract)(s) {
         Ok((s, Some(frac))) => {
@@ -65,7 +65,7 @@ fn parse_float(s: &str) -> IResult<&str, Token> {
             let float = int.copysign(sign);
             Ok((s, Token::Float(float)))
         }
-        _err => Err(Err::Failure((s, ErrorKind::Float))),
+        _err => Err(Err::Error((s, ErrorKind::Float))),
     }
 }
 
