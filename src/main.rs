@@ -22,8 +22,8 @@ enum Token<'a> {
     CloseBracket,
     OpenBrace,
     CloseBrace,
-    // AtMark,
-    // Equal,
+    TimeAt,
+    Assign,
 }
 
 fn parse_int(s: &str) -> IResult<&str, f64> {
@@ -100,6 +100,16 @@ fn parse_binop(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::BinaryOp(op)))
 }
 
+fn parse_assignment(s: &str) -> IResult<&str, Token> {
+    let (s, _) = char('=')(s)?;
+    Ok((s, Token::Assign))
+}
+
+fn parse_time_at(s: &str) -> IResult<&str, Token> {
+    let (s, _) = char('@')(s)?;
+    Ok((s, Token::TimeAt))
+}
+
 fn parse_string(s: &str) -> IResult<&str, Token> {
     let (s, (_, string, _)) = tuple((char('"'), many1(none_of("\"")), char('"')))(s)?;
     let string: String = string.iter().collect();
@@ -141,6 +151,8 @@ fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
             parse_keyword,
             parse_parens,
             parse_string,
+            parse_assignment,
+            parse_time_at,
         ))(input)?;
         input = s;
         tokens.push(token);
