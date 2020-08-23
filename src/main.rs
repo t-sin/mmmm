@@ -215,7 +215,7 @@ mod test {
         }
     }
 
-    //    #[test]
+    #[test]
     fn test_parse_tokens() {
         test_parse_tokens_1(vec![Token::Float(-127.0)], "-127");
         test_parse_tokens_1(vec![Token::Float(-127.0), Token::Float(127.0)], "-127 127");
