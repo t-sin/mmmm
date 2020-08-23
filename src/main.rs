@@ -4,7 +4,7 @@ use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
 use nom::character::complete::{char, digit1, multispace0};
 use nom::combinator::{all_consuming, opt};
-use nom::error::{ErrorKind, VerboseErrorKind};
+use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq)]
@@ -34,7 +34,7 @@ fn parse_int(s: &str) -> IResult<&str, f64> {
                 Err(Err::Failure((s, ErrorKind::Digit)))
             }
         }
-        err => Err(Err::Failure((s, ErrorKind::Digit))),
+        _ => Err(Err::Failure((s, ErrorKind::Digit))),
     }
 }
 
@@ -54,9 +54,8 @@ fn parse_float(s: &str) -> IResult<&str, Token> {
 
     let (s, int) = match parse_int(s) {
         Ok((s, int)) => (s, int),
-        err => return Err(Err::Failure((s, ErrorKind::Digit))),
+        _ => return Err(Err::Failure((s, ErrorKind::Digit))),
     };
-
     match opt(parse_fract)(s) {
         Ok((s, Some(frac))) => {
             let float = (int + frac).copysign(sign);
