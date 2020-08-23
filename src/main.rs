@@ -14,12 +14,12 @@ enum Token<'a> {
     BinaryOp(&'a str),
     // Identifier(&'a str),
     // String(&'a str),
-    // OpenParen,
-    // CloseParen,
-    // OpenBracket,
-    // CloseBracket,
-    // OpenBrace,
-    // CloseBrace,
+    OpenParen,
+    CloseParen,
+    OpenBracket,
+    CloseBracket,
+    OpenBrace,
+    CloseBrace,
     // AtMark,
     // Equal,
 }
@@ -98,6 +98,27 @@ fn parse_binop(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::BinaryOp(op)))
 }
 
+fn parse_parens(s: &str) -> IResult<&str, Token> {
+    let (s, token) = match alt((
+        char('('),
+        char(')'),
+        char('['),
+        char(']'),
+        char('{'),
+        char('}'),
+    ))(s)?
+    {
+        (s, '(') => (s, Token::OpenParen),
+        (s, ')') => (s, Token::CloseParen),
+        (s, '[') => (s, Token::OpenBracket),
+        (s, ']') => (s, Token::CloseBracket),
+        (s, '{') => (s, Token::OpenBrace),
+        (s, '}') => (s, Token::CloseBrace),
+        (s, _) => return Err(Err::Error((s, ErrorKind::Char))),
+    };
+    Ok((s, token))
+}
+
 fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
     let mut tokens = Vec::new();
     let mut input = s;
@@ -106,7 +127,7 @@ fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
         let (s, _) = opt(multispace0::<&str, (&str, ErrorKind)>)(input)?;
         input = s;
 
-        let (s, token) = alt((parse_float, parse_binop, parse_keyword))(input)?;
+        let (s, token) = alt((parse_float, parse_binop, parse_keyword, parse_parens))(input)?;
         input = s;
         tokens.push(token);
         if s == "" {
@@ -227,6 +248,19 @@ mod test {
                 Token::Float(0.0),
             ],
             "-127 127 now 0",
+        );
+
+        test_parse_tokens_1(
+            vec![
+                Token::Float(0.5),
+                Token::BinaryOp("*"),
+                Token::OpenParen,
+                Token::Float(1.0),
+                Token::BinaryOp("+"),
+                Token::Float(2.0),
+                Token::CloseParen,
+            ],
+            "0.5*(1+2)",
         );
     }
 }
