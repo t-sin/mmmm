@@ -160,7 +160,7 @@ fn parse_identifier(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::Identifier([first, rest].concat())))
 }
 
-fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
+fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     let mut tokens = Vec::new();
     let mut input = s;
 
@@ -195,7 +195,7 @@ fn parse(s: &str) -> IResult<&str, Token> {
 
 fn main() {
     let input = "-123.0 + 456.7";
-    match parse_tokens(input) {
+    match tokenize(input) {
         Ok((_, tokens)) => println!("parsed: {:?}", tokens),
         err => panic!("parse error: {:?}", err),
     }
@@ -284,20 +284,20 @@ mod test {
         test_parse_fn(&parse_string, Token::String("moji".to_string()), "\"moji\"");
     }
 
-    fn test_parse_tokens_1(expected: Vec<Token>, input: &str) {
-        if let Ok(("", result)) = parse_tokens(input) {
+    fn test_tokenize_1(expected: Vec<Token>, input: &str) {
+        if let Ok(("", result)) = tokenize(input) {
             assert_eq!(expected, result);
         } else {
-            println!("result = {:?}", parse_tokens(input));
+            println!("result = {:?}", tokenize(input));
             assert!(false);
         }
     }
 
     #[test]
-    fn test_parse_tokens() {
-        test_parse_tokens_1(vec![Token::Float(-127.0)], "-127");
-        test_parse_tokens_1(vec![Token::Float(-127.0), Token::Float(127.0)], "-127 127");
-        test_parse_tokens_1(
+    fn test_tokenize() {
+        test_tokenize_1(vec![Token::Float(-127.0)], "-127");
+        test_tokenize_1(vec![Token::Float(-127.0), Token::Float(127.0)], "-127 127");
+        test_tokenize_1(
             vec![
                 Token::Float(-127.0),
                 Token::Float(127.0),
@@ -307,7 +307,7 @@ mod test {
             "-127 127 now 0",
         );
 
-        test_parse_tokens_1(
+        test_tokenize_1(
             vec![
                 Token::Float(0.5),
                 Token::BinaryOp("*"),
@@ -320,7 +320,7 @@ mod test {
             "0.5*(1+2)",
         );
 
-        test_parse_tokens_1(
+        test_tokenize_1(
             vec![
                 Token::String("abc".to_string()),
                 Token::BinaryOp("+"),
@@ -329,7 +329,7 @@ mod test {
             "\"abc\" + \"123\"",
         );
 
-        test_parse_tokens_1(
+        test_tokenize_1(
             vec![
                 Token::Keyword("fn"),
                 Token::Identifier("func".to_string()),
