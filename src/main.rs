@@ -103,24 +103,14 @@ fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
     let mut input = s;
 
     loop {
-        println!("input1: {:?}", input);
-        match multispace0::<&str, (&str, ErrorKind)>(input) {
-            Ok((s, _)) => input = s,
-            _ => (),
-        }
+        let (s, _) = opt(multispace0::<&str, (&str, ErrorKind)>)(input)?;
+        input = s;
 
-        println!("input2: {:?}", input);
-        match alt((parse_float, parse_binop, parse_keyword))(input) {
-            Ok(("", token)) => {
-                input = "";
-                tokens.push(token);
-                break;
-            }
-            Ok((s, token)) => {
-                input = s;
-                tokens.push(token);
-            }
-            Err(e) => return Err(e),
+        let (s, token) = alt((parse_float, parse_binop, parse_keyword))(input)?;
+        input = s;
+        tokens.push(token);
+        if s == "" {
+            break;
         }
     }
 
