@@ -2,9 +2,11 @@ extern crate nom;
 
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
-use nom::character::complete::{char, digit1, multispace0};
+use nom::character::complete::{char, digit1, multispace0, none_of};
 use nom::combinator::{all_consuming, opt};
 use nom::error::ErrorKind;
+use nom::multi::many1;
+use nom::sequence::tuple;
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq)]
@@ -13,7 +15,7 @@ enum Token<'a> {
     Keyword(&'a str),
     BinaryOp(&'a str),
     // Identifier(&'a str),
-    // String(&'a str),
+    String(String),
     OpenParen,
     CloseParen,
     OpenBracket,
@@ -98,6 +100,12 @@ fn parse_binop(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::BinaryOp(op)))
 }
 
+fn parse_string(s: &str) -> IResult<&str, Token> {
+    let (s, (_, string, _)) = tuple((char('"'), many1(none_of("\"")), char('"')))(s)?;
+    let string: String = string.iter().collect();
+    Ok((s, Token::String(string)))
+}
+
 fn parse_parens(s: &str) -> IResult<&str, Token> {
     let (s, token) = match alt((
         char('('),
@@ -127,7 +135,13 @@ fn parse_tokens(s: &str) -> IResult<&str, Vec<Token>> {
         let (s, _) = opt(multispace0::<&str, (&str, ErrorKind)>)(input)?;
         input = s;
 
-        let (s, token) = alt((parse_float, parse_binop, parse_keyword, parse_parens))(input)?;
+        let (s, token) = alt((
+            parse_float,
+            parse_binop,
+            parse_keyword,
+            parse_parens,
+            parse_string,
+        ))(input)?;
         input = s;
         tokens.push(token);
         if s == "" {
@@ -228,10 +242,16 @@ mod test {
         test_parse_fn(&parse_keyword, Token::Keyword("now"), "now");
     }
 
+    #[test]
+    fn test_parse_string() {
+        test_parse_fn(&parse_string, Token::String("moji".to_string()), "\"moji\"");
+    }
+
     fn test_parse_tokens_1(expected: Vec<Token>, input: &str) {
         if let Ok(("", result)) = parse_tokens(input) {
             assert_eq!(expected, result);
         } else {
+            println!("result = {:?}", parse_tokens(input));
             assert!(false);
         }
     }
@@ -261,6 +281,15 @@ mod test {
                 Token::CloseParen,
             ],
             "0.5*(1+2)",
+        );
+
+        test_parse_tokens_1(
+            vec![
+                Token::String("abc".to_string()),
+                Token::BinaryOp("+"),
+                Token::String("123".to_string()),
+            ],
+            "\"abc\" + \"123\"",
         );
     }
 }
