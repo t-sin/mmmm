@@ -150,12 +150,14 @@ mod test {
         if let Ok(("", result)) = parse_fn(input) {
             assert_eq!(expected, result);
         } else {
+            println!("result = {:?}", parse_fn(input));
             assert!(false);
         }
     }
 
     fn test_parse_fn_with_error(parse_fn: &ParseFn, input: &str) {
-        if let Ok(("", result)) = parse_fn(input) {
+        if let Ok(("", _)) = parse_fn(input) {
+            println!("result = {:?}", parse_fn(input));
             assert!(false);
         } else {
             assert!(true);
