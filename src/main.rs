@@ -83,19 +83,18 @@ fn parse_keyword(s: &str) -> IResult<&str, Token> {
 }
 
 fn parse_binop(s: &str) -> IResult<&str, Token> {
-    // let (s, op) = alt((
-    //     tag("+"),
-    //     tag("-"),
-    //     tag("*"),
-    //     tag("/"),
-    //     tag("%"),
-    //     tag("<"),
-    //     tag(">"),
-    //     tag("<="),
-    //     tag(">="),
-    //     tag("=="),
-    // ))(s)?;
-    let (s, op) = tag("+")(s)?;
+    let (s, op) = alt((
+        tag("<="),
+        tag(">="),
+        tag("=="),
+        tag("+"),
+        tag("-"),
+        tag("*"),
+        tag("/"),
+        tag("%"),
+        tag("<"),
+        tag(">"),
+    ))(s)?;
     Ok((s, Token::BinaryOp(op)))
 }
 
