@@ -193,7 +193,27 @@ mod test {
 
     #[test]
     fn test_parse_binop() {
-        test_parse_fn(&parse_float, Token::BinaryOp("+"), "+");
+        test_parse_fn(&parse_binop, Token::BinaryOp("+"), "+");
+        test_parse_fn(&parse_binop, Token::BinaryOp("-"), "-");
+        test_parse_fn(&parse_binop, Token::BinaryOp("*"), "*");
+        test_parse_fn(&parse_binop, Token::BinaryOp("/"), "/");
+        test_parse_fn(&parse_binop, Token::BinaryOp("%"), "%");
+        test_parse_fn(&parse_binop, Token::BinaryOp("<"), "<");
+        test_parse_fn(&parse_binop, Token::BinaryOp(">"), ">");
+        test_parse_fn(&parse_binop, Token::BinaryOp("<="), "<=");
+        test_parse_fn(&parse_binop, Token::BinaryOp(">="), ">=");
+        test_parse_fn(&parse_binop, Token::BinaryOp("=="), "==");
+    }
+
+    #[test]
+    fn test_parse_keyword() {
+        test_parse_fn(&parse_keyword, Token::Keyword("fn"), "fn");
+        test_parse_fn(&parse_keyword, Token::Keyword("return"), "return");
+        test_parse_fn(&parse_keyword, Token::Keyword("if"), "if");
+        test_parse_fn(&parse_keyword, Token::Keyword("else"), "else");
+        test_parse_fn(&parse_keyword, Token::Keyword("void"), "void");
+        test_parse_fn(&parse_keyword, Token::Keyword("float"), "float");
+        test_parse_fn(&parse_keyword, Token::Keyword("now"), "now");
     }
 
     fn test_parse_tokens_1(expected: Vec<Token>, input: &str) {
