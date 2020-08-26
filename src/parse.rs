@@ -204,10 +204,10 @@ fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
     }
 }
 
-pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
+pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
     let input = t;
     let (t, ast) = parse_float(input)?;
-    Ok((t, ast))
+    Ok((t, vec![ast]))
 }
 
 #[cfg(test)]
@@ -371,8 +371,14 @@ mod test_parse {
     fn test_parse() {
         if let Ok(("", tokens)) = tokenize("0.0") {
             match parse(&tokens) {
-                Ok((t, AST::Float(f))) => {
-                    assert_eq!(0.0, f);
+                Ok((&[], vec)) => {
+                    assert_eq!(1, vec.len());
+                    if let Some(AST::Float(ref f)) = vec.iter().nth(0) {
+                        assert_eq!(0.0, *f);
+                    } else {
+                        println!("This test case itself is wrong....");
+                        assert!(false);
+                    }
                 }
                 err => {
                     println!("{:?}", err);
