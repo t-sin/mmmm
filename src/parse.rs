@@ -188,12 +188,26 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     Ok((input, tokens))
 }
 
+#[derive(Debug)]
 pub enum AST {
     Float(f64),
 }
 
-pub fn parse<'a>(_s: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
-    Ok((&[], AST::Float(0.0)))
+fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
+    if t.len() > 0 {
+        match t[0] {
+            Token::Float(f) => Ok((&t[1..], AST::Float(f))),
+            _ => Err(Err::Error((t, ErrorKind::Float))),
+        }
+    } else {
+        Err(Err::Error((t, ErrorKind::Float)))
+    }
+}
+
+pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
+    let input = t;
+    let (t, ast) = parse_float(input)?;
+    Ok((t, ast))
 }
 
 #[cfg(test)]
@@ -346,5 +360,28 @@ mod test_tokenize {
             ],
             "fn func() -> void { return array[0]}",
         );
+    }
+}
+
+#[cfg(test)]
+mod test_parse {
+    use super::*;
+
+    #[test]
+    fn test_parse() {
+        if let Ok(("", tokens)) = tokenize("0.0") {
+            match parse(&tokens) {
+                Ok((t, AST::Float(f))) => {
+                    assert_eq!(0.0, f);
+                }
+                err => {
+                    println!("{:?}", err);
+                    assert!(false);
+                }
+            }
+        } else {
+            println!("This test case itself is wrong....");
+            assert!(false);
+        }
     }
 }
