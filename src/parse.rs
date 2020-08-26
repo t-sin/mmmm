@@ -197,7 +197,7 @@ pub fn parse<'a>(_s: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
 }
 
 #[cfg(test)]
-mod test {
+mod test_tokenize {
     use super::*;
 
     type TokenizeFn = dyn Fn(&str) -> IResult<&str, Token>;
