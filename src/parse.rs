@@ -1,7 +1,7 @@
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
 use nom::character::complete::{char, digit1, multispace0, none_of, one_of};
-use nom::combinator::{all_consuming, opt};
+use nom::combinator::opt;
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
