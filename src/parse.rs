@@ -189,14 +189,24 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
 }
 
 #[derive(Debug)]
-pub enum AST {
+pub struct Symbol(String);
+
+#[derive(Debug)]
+pub enum Exp {
     Float(f64),
+    BinOp(String, Box<Exp>, Box<Exp>),
+    PostOp(String, Box<Symbol>, Box<Exp>),
+}
+
+#[derive(Debug)]
+pub enum AST {
+    Exp(Box<Exp>),
 }
 
 fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
     if t != &[] {
         match t[0] {
-            Token::Float(f) => Ok((&t[1..], AST::Float(f))),
+            Token::Float(f) => Ok((&t[1..], AST::Exp(Box::new(Exp::Float(f))))),
             _ => Err(Err::Error((t, ErrorKind::Float))),
         }
     } else {
@@ -204,7 +214,28 @@ fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
     }
 }
 
-pub fn parse_1<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
+/// 演算子の優先順位を決定する
+///
+/// 数が小さいほうが優先度が高い
+fn operator_precedence(op: &str) -> i32 {
+    match op {
+        "[]" | "()" => 1, // 後置演算子
+        "." => 1,         // メンバアクセス演算子。まだない。
+        "!" => 2,         // ないけど
+        "*" | "/" | "%" => 3,
+        "+" | "-" => 4,
+        "<" | ">" | "<=" | ">=" | "==" => 5,
+        "&&" => 6,
+        "||" => 7,
+        _ => -1, // そんな演算子はないエラー
+    }
+}
+
+fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
+    Ok((t, AST::Exp(Box::new(Exp::Float(0.0)))))
+}
+
+fn parse_1<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
     parse_float(t)
 }
 
@@ -389,8 +420,14 @@ mod test_parse {
             match parse(&tokens) {
                 Ok((&[], vec)) => {
                     assert_eq!(1, vec.len());
-                    if let Some(AST::Float(ref f)) = vec.iter().nth(0) {
-                        assert_eq!(0.0, *f);
+
+                    if let Some(AST::Exp(exp)) = vec.iter().nth(0) {
+                        if let Exp::Float(f) = **exp {
+                            assert_eq!(0.0, f);
+                        } else {
+                            println!("error: {:?}", vec);
+                            assert!(false);
+                        }
                     } else {
                         println!("This test case itself is wrong....");
                         assert!(false);
