@@ -194,7 +194,7 @@ pub enum AST {
 }
 
 fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
-    if t.len() > 0 {
+    if t != &[] {
         match t[0] {
             Token::Float(f) => Ok((&t[1..], AST::Float(f))),
             _ => Err(Err::Error((t, ErrorKind::Float))),
@@ -204,10 +204,25 @@ fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
     }
 }
 
+pub fn parse_1<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
+    parse_float(t)
+}
+
 pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
-    let input = t;
-    let (t, ast) = parse_float(input)?;
-    Ok((t, vec![ast]))
+    let mut asts = Vec::new();
+    let mut input = t;
+
+    loop {
+        if input == &[] {
+            break;
+        }
+
+        let (t, ast) = parse_1(&input)?;
+        input = t;
+        asts.push(ast);
+    }
+
+    Ok((input, asts))
 }
 
 #[cfg(test)]
@@ -370,6 +385,7 @@ mod test_parse {
     #[test]
     fn test_parse() {
         if let Ok(("", tokens)) = tokenize("0.0") {
+            println!("tokens: {:?}", tokens);
             match parse(&tokens) {
                 Ok((&[], vec)) => {
                     assert_eq!(1, vec.len());
