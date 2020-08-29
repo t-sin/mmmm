@@ -79,6 +79,7 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
         tag("float"),
         tag("void"),
         tag("now"),
+        tag("self"),
     ))(s)?;
     Ok((s, Token::Keyword(name)))
 }
