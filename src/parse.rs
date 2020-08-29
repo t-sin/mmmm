@@ -413,21 +413,15 @@ mod test_tokenize {
 mod test_parse {
     use super::*;
 
-    #[test]
-    fn test_parse() {
-        if let Ok(("", tokens)) = tokenize("0.0") {
+    fn test_parse_1(expected: AST, string: &str) {
+        if let Ok(("", tokens)) = tokenize(string) {
             println!("tokens: {:?}", tokens);
             match parse(&tokens) {
                 Ok((&[], vec)) => {
                     assert_eq!(1, vec.len());
 
-                    if let Some(AST::Exp(exp)) = vec.iter().nth(0) {
-                        if let Exp::Float(f) = **exp {
-                            assert_eq!(0.0, f);
-                        } else {
-                            println!("error: {:?}", vec);
-                            assert!(false);
-                        }
+                    if let Some(ast) = vec.iter().nth(0) {
+                        assert_eq!(*ast, expected);
                     } else {
                         println!("This test case itself is wrong....");
                         assert!(false);
@@ -442,5 +436,10 @@ mod test_parse {
             println!("This test case itself is wrong....");
             assert!(false);
         }
+    }
+
+    #[test]
+    fn test_parse() {
+        test_parse_1(AST::Exp(Box::new(Exp::Float(0.0))), "0.0");
     }
 }
