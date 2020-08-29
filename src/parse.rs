@@ -233,11 +233,11 @@ fn operator_precedence(op: &str) -> i32 {
 }
 
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
-    Ok((t, AST::Exp(Box::new(Exp::Float(0.0)))))
+    parse_float(t)
 }
 
 fn parse_1<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
-    parse_float(t)
+    parse_expression(t)
 }
 
 pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
