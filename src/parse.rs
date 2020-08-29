@@ -188,17 +188,17 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     Ok((input, tokens))
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct Symbol(String);
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum Exp {
     Float(f64),
     BinOp(String, Box<Exp>, Box<Exp>),
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum AST {
     Exp(Box<Exp>),
 }
