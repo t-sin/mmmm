@@ -1,13 +1,15 @@
+use std::collections::VecDeque;
+
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
-use nom::character::complete::{char, digit1, multispace0, none_of, one_of};
+use nom::character::complete::{char, digit1, multispace0, newline, none_of, one_of};
 use nom::combinator::opt;
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
 use nom::{Err, IResult};
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     Float(f64),
     Keyword(&'a str),
@@ -213,6 +215,9 @@ pub struct Symbol(String);
 #[derive(Debug, PartialEq)]
 pub enum Exp {
     Float(f64),
+    String(String),
+    Variable(Box<Symbol>),
+    InvokeFn(Box<Symbol>, Vec<Exp>),
     BinOp(String, Box<Exp>, Box<Exp>),
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
@@ -230,6 +235,25 @@ fn parse_float<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
         }
     } else {
         Err(Err::Error((t, ErrorKind::Float)))
+    }
+}
+
+enum OperatorAssociativity {
+    Left,
+    Right,
+    None,
+}
+
+fn operator_associativity(op: &str) -> OperatorAssociativity {
+    match op {
+        "[]" | "()" => OperatorAssociativity::None,
+        "." => OperatorAssociativity::Left,
+        "!" => OperatorAssociativity::Right,
+        "+" | "-" | "*" | "/" | "%" => OperatorAssociativity::Left,
+        "<=" | ">=" | "==" => OperatorAssociativity::Left,
+        "<" | ">" => OperatorAssociativity::Left,
+        "&&" | "||" => OperatorAssociativity::Left,
+        _ => OperatorAssociativity::None,
     }
 }
 
@@ -251,8 +275,156 @@ fn operator_precedence(op: &str) -> i32 {
     }
 }
 
+/// 操車場アルゴリズムでトークン列を逆ポーランド記法に並び換える
+fn shunting_yard<'a>(
+    t: &'a [Token<'a>],
+) -> Result<(&'a [Token<'a>], Vec<&'a Token>), Err<(&'a [Token<'a>], ErrorKind)>> {
+    let mut input = t;
+    let mut output: VecDeque<&'a Token<'a>> = VecDeque::new();
+    let mut stack: Vec<&'a Token<'a>> = Vec::new();
+
+    'outer: loop {
+        let token = input.iter().nth(0);
+        if input.len() > 0 {
+            input = &input[1..]
+        }
+
+        match token {
+            Some(Token::CloseBrace) => break,
+            Some(Token::Float(_)) => output.push_back(&token.unwrap()),
+            Some(Token::String(_)) => output.push_back(&token.unwrap()),
+            Some(Token::Keyword(_)) => return Err(Err::Error((t, ErrorKind::IsNot))),
+            Some(Token::Special(_)) => output.push_back(&token.unwrap()),
+            Some(Token::Identifier(_)) => {
+                if let Some(Token::OpenParen) = input.iter().nth(0) {
+                    // function invokation
+                    stack.push(&token.unwrap());
+                } else {
+                    // variable
+                    output.push_back(&token.unwrap());
+                }
+            }
+            Some(Token::Comma) => loop {
+                let _ = input.iter().nth(0);
+                if input.len() > 0 {
+                    input = &input[1..];
+                }
+
+                if let Some(Token::OpenParen) = stack.last() {
+                    if let Some(top) = stack.pop() {
+                        output.push_back(&top);
+                        break;
+                    } else {
+                        return Err(Err::Error((t, ErrorKind::IsNot)));
+                    }
+                }
+            },
+            Some(Token::BinaryOp(op1)) => {
+                loop {
+                    if let Some(Token::BinaryOp(op2)) = stack.last() {
+                        if let OperatorAssociativity::Left = operator_associativity(op1) {
+                            if operator_precedence(op1) <= operator_precedence(op2) {
+                                output.push_back(&stack.pop().unwrap());
+                            } else {
+                                break;
+                            }
+                        } else {
+                            if operator_precedence(op1) < operator_precedence(op2) {
+                                output.push_back(&stack.pop().unwrap());
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                stack.push(&token.unwrap());
+            }
+            Some(Token::OpenParen) => stack.push(&token.unwrap()),
+            Some(Token::CloseParen) => loop {
+                let token = input.iter().nth(0);
+                if input.len() > 0 {
+                    input = &input[1..]
+                }
+                if let Some(Token::OpenParen) = token {
+                    if let None = stack.pop() {
+                        return Err(Err::Error((t, ErrorKind::IsNot)));
+                    }
+
+                    let token = input.iter().nth(0);
+                    if input.len() > 0 {
+                        input = &input[1..]
+                    }
+
+                    if let Some(Token::Identifier(_)) = token {
+                        output.push_back(&token.unwrap());
+                        break;
+                    } else {
+                        return Err(Err::Error((t, ErrorKind::IsNot)));
+                    }
+                } else {
+                    break;
+                }
+            },
+            Some(Token::OpenBrace)
+            | Some(Token::OpenBracket)
+            | Some(Token::CloseBracket)
+            | Some(Token::FnReturnType)
+            | Some(Token::Assign)
+            | Some(Token::TimeAt) => {
+                return Err(Err::Error((t, ErrorKind::IsNot)));
+            }
+            Some(Token::Newline) | None => loop {
+                if stack.len() == 0 {
+                    break 'outer;
+                }
+
+                if let Some(Token::OpenParen) | Some(Token::CloseParen) = stack.last() {
+                    return Err(Err::Error((t, ErrorKind::IsNot)));
+                } else {
+                    output.push_back(stack.pop().unwrap())
+                }
+            },
+        };
+    }
+
+    return Ok((&input[..], output.into()));
+}
+
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
-    parse_float(t)
+    let rest;
+    let tokens;
+    match shunting_yard(t) {
+        Ok((t, rpn_tokens)) => {
+            rest = t;
+            tokens = rpn_tokens;
+        }
+        Err(err) => return Err(err),
+    }
+
+    let mut stack = Vec::new();
+    for t in tokens.iter() {
+        let exp = match t {
+            Token::Float(f) => AST::Exp(Box::new(Exp::Float(*f))),
+            Token::String(s) => AST::Exp(Box::new(Exp::String(s.to_string()))),
+            Token::Special(name) => {
+                AST::Exp(Box::new(Exp::Variable(Box::new(Symbol(name.to_string())))))
+            }
+            Token::BinaryOp(name) => {
+                if let (Some(AST::Exp(exp1)), Some(AST::Exp(exp2))) = (stack.pop(), stack.pop()) {
+                    AST::Exp(Box::new(Exp::BinOp(name.to_string(), exp1, exp2)))
+                } else {
+                    return Err(Err::Error((rest, ErrorKind::IsNot)));
+                }
+            }
+            _ => return Err(Err::Error((rest, ErrorKind::IsNot))),
+        };
+
+        stack.push(exp);
+    }
+
+    Ok((rest, stack.pop().unwrap()))
 }
 
 fn parse_1<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], AST> {
@@ -264,11 +436,11 @@ pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
     let mut input = t;
 
     loop {
-        if input == &[] {
+        if input.len() == 0 {
             break;
         }
 
-        let (t, ast) = parse_1(&input)?;
+        let (t, ast) = parse_1(input)?;
         input = t;
         asts.push(ast);
     }
