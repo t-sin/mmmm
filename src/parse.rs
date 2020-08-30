@@ -711,5 +711,27 @@ mod test_parse {
             ))),
             "10-5",
         );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinOp(
+                "*".to_string(),
+                Box::new(Exp::Float(42.0)),
+                Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(1.0)))),
+            ))),
+            "42*-1",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinOp(
+                "*".to_string(),
+                Box::new(Exp::BinOp(
+                    "+".to_string(),
+                    Box::new(Exp::Float(1.0)),
+                    Box::new(Exp::Float(2.0)),
+                )),
+                Box::new(Exp::Float(3.0)),
+            ))),
+            "(1+2)*3",
+        );
     }
 }
