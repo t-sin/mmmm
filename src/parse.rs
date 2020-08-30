@@ -327,14 +327,14 @@ fn shunting_yard<'a>(
                 panic!("binary operator does not have textual representation.")
             }
             Some(Token::Op(op1)) => {
-                let mut binary_p = false;
-                match prev_token {
-                    Some(Token::Float(_)) if op1 == &"-" => binary_p = true,
-                    Some(_) => binary_p = true,
-                    None => (),
-                }
+                let unary_p = match prev_token {
+                    Some(Token::Float(_)) if op1 == &"-" => false,
+                    Some(Token::Op(_)) if op1 == &"-" => true,
+                    Some(_) => false,
+                    None => true,
+                };
 
-                if !binary_p {
+                if unary_p {
                     let next_token = input.iter().nth(0);
                     if input.len() > 0 {
                         input = &input[1..]
