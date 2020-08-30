@@ -51,9 +51,6 @@ fn tokenize_fract(s: &str) -> IResult<&str, f64> {
 }
 
 fn tokenize_float(s: &str) -> IResult<&str, Token> {
-    let (s, sign) = opt(char('-'))(s)?;
-    let sign: f64 = if let None = sign { 1.0 } else { -1.0 };
-
     if s == "" {
         return Err(Err::Error((s, ErrorKind::Eof)));
     }
@@ -64,13 +61,10 @@ fn tokenize_float(s: &str) -> IResult<&str, Token> {
     };
     match opt(tokenize_fract)(s) {
         Ok((s, Some(frac))) => {
-            let float = (int + frac).copysign(sign);
+            let float = int + frac;
             Ok((s, Token::Float(float)))
         }
-        Ok((s, None)) => {
-            let float = int.copysign(sign);
-            Ok((s, Token::Float(float)))
-        }
+        Ok((s, None)) => Ok((s, Token::Float(int))),
         _err => Err(Err::Error((s, ErrorKind::Float))),
     }
 }
@@ -480,15 +474,14 @@ mod test_tokenize {
     #[test]
     fn test_invalid_float() {
         test_tokenize_fn_with_error(&tokenize_float, ".0");
-        test_tokenize_fn_with_error(&tokenize_float, "-.0");
         test_tokenize_fn_with_error(&tokenize_float, ".012");
+        test_tokenize_fn_with_error(&tokenize_float, "-.0");
     }
 
     #[test]
     fn test_tokenize_float() {
         test_tokenize_fn(&tokenize_float, Token::Float(0.0), "0");
         test_tokenize_fn(&tokenize_float, Token::Float(0.0), "0.0");
-        test_tokenize_fn(&tokenize_float, Token::Float(0.0), "-0");
 
         test_tokenize_fn(&tokenize_float, Token::Float(1.0), "1");
         test_tokenize_fn(&tokenize_float, Token::Float(123.0), "123");
@@ -496,9 +489,10 @@ mod test_tokenize {
         test_tokenize_fn(&tokenize_float, Token::Float(123.0), "123.0");
         test_tokenize_fn(&tokenize_float, Token::Float(123.012), "123.012");
 
-        test_tokenize_fn(&tokenize_float, Token::Float(-1.0), "-1");
-        test_tokenize_fn(&tokenize_float, Token::Float(-1.0), "-1.0");
-        test_tokenize_fn(&tokenize_float, Token::Float(-127.0), "-127");
+        test_tokenize_fn_with_error(&tokenize_float, "-0");
+        test_tokenize_fn_with_error(&tokenize_float, "-1");
+        test_tokenize_fn_with_error(&tokenize_float, "-1.0");
+        test_tokenize_fn_with_error(&tokenize_float, "-127");
     }
 
     #[test]
