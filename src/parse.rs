@@ -11,9 +11,11 @@ use nom::{Err, IResult};
 pub enum Token<'a> {
     Float(f64),
     Keyword(&'a str),
+    Special(&'a str),
     BinaryOp(&'a str),
     Identifier(String),
     String(String),
+    Comma,
     OpenParen,
     CloseParen,
     OpenBracket,
@@ -23,6 +25,7 @@ pub enum Token<'a> {
     FnReturnType,
     Assign,
     TimeAt,
+    Newline,
 }
 
 fn tokenize_int(s: &str) -> IResult<&str, f64> {
@@ -78,10 +81,13 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
         tag("else"),
         tag("float"),
         tag("void"),
-        tag("now"),
-        tag("self"),
     ))(s)?;
     Ok((s, Token::Keyword(name)))
+}
+
+fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
+    let (s, op) = alt((tag("now"), tag("self")))(s)?;
+    Ok((s, Token::Special(op)))
 }
 
 fn tokenize_binop(s: &str) -> IResult<&str, Token> {
@@ -98,6 +104,11 @@ fn tokenize_binop(s: &str) -> IResult<&str, Token> {
         tag(">"),
     ))(s)?;
     Ok((s, Token::BinaryOp(op)))
+}
+
+fn tokenize_comma(s: &str) -> IResult<&str, Token> {
+    let (s, _) = char(',')(s)?;
+    Ok((s, Token::Comma))
 }
 
 fn tokenize_assignment(s: &str) -> IResult<&str, Token> {
@@ -159,6 +170,11 @@ fn tokenize_identifier(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::Identifier([first, rest].concat())))
 }
 
+fn tokenize_newline(s: &str) -> IResult<&str, Token> {
+    let (s, _) = newline(s)?;
+    Ok((s, Token::Newline))
+}
+
 pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     let mut tokens = Vec::new();
     let mut input = s;
@@ -175,7 +191,9 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
             tokenize_float,
             tokenize_fn_return_type,
             tokenize_binop,
+            tokenize_special_variable,
             tokenize_keyword,
+            tokenize_comma,
             tokenize_parens,
             tokenize_string,
             tokenize_assignment,
@@ -332,7 +350,12 @@ mod test_tokenize {
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("else"), "else");
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("void"), "void");
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("float"), "float");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("now"), "now");
+    }
+
+    #[test]
+    fn test_tokenize_special_variable() {
+        test_tokenize_fn(&tokenize_special_variable, Token::Special("now"), "now");
+        test_tokenize_fn(&tokenize_special_variable, Token::Special("self"), "self");
     }
 
     #[test]
@@ -361,7 +384,7 @@ mod test_tokenize {
             vec![
                 Token::Float(-127.0),
                 Token::Float(127.0),
-                Token::Keyword("now"),
+                Token::Special("now"),
                 Token::Float(0.0),
             ],
             "-127 127 now 0",
