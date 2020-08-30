@@ -14,6 +14,8 @@ pub enum Token<'a> {
     Float(f64),
     Keyword(&'a str),
     Special(&'a str),
+    Op(&'a str),
+    UnaryOp(&'a str),
     BinaryOp(&'a str),
     Identifier(String),
     String(String),
@@ -86,7 +88,7 @@ fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::Special(op)))
 }
 
-fn tokenize_binop(s: &str) -> IResult<&str, Token> {
+fn tokenize_op(s: &str) -> IResult<&str, Token> {
     let (s, op) = alt((
         tag("<="),
         tag(">="),
@@ -98,8 +100,9 @@ fn tokenize_binop(s: &str) -> IResult<&str, Token> {
         tag("%"),
         tag("<"),
         tag(">"),
+        tag("！"),
     ))(s)?;
-    Ok((s, Token::BinaryOp(op)))
+    Ok((s, Token::Op(op)))
 }
 
 fn tokenize_comma(s: &str) -> IResult<&str, Token> {
@@ -186,7 +189,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
         let (s, token) = alt((
             tokenize_float,
             tokenize_fn_return_type,
-            tokenize_binop,
+            tokenize_op,
             tokenize_special_variable,
             tokenize_keyword,
             tokenize_comma,
@@ -195,6 +198,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
             tokenize_assignment,
             tokenize_time_at,
             tokenize_identifier,
+            tokenize_newline,
         ))(input)?;
         input = s;
         tokens.push(token);
@@ -212,6 +216,7 @@ pub enum Exp {
     String(String),
     Variable(Box<Symbol>),
     InvokeFn(Box<Symbol>, Vec<Exp>),
+    UnaryOp(String, Box<Exp>),
     BinOp(String, Box<Exp>, Box<Exp>),
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
@@ -272,30 +277,32 @@ fn operator_precedence(op: &str) -> i32 {
 /// 操車場アルゴリズムでトークン列を逆ポーランド記法に並び換える
 fn shunting_yard<'a>(
     t: &'a [Token<'a>],
-) -> Result<(&'a [Token<'a>], Vec<&'a Token>), Err<(&'a [Token<'a>], ErrorKind)>> {
+) -> Result<(&'a [Token<'a>], Vec<Token>), Err<(&'a [Token<'a>], ErrorKind)>> {
     let mut input = t;
-    let mut output: VecDeque<&'a Token<'a>> = VecDeque::new();
-    let mut stack: Vec<&'a Token<'a>> = Vec::new();
+    let mut output: VecDeque<Token<'a>> = VecDeque::new();
+    let mut stack: Vec<Token<'a>> = Vec::new();
+    let mut prev_token = None;
 
     'outer: loop {
         let token = input.iter().nth(0);
+        let prev_input = input;
         if input.len() > 0 {
             input = &input[1..]
         }
 
         match token {
             Some(Token::CloseBrace) => break,
-            Some(Token::Float(_)) => output.push_back(&token.unwrap()),
-            Some(Token::String(_)) => output.push_back(&token.unwrap()),
+            Some(Token::Float(_)) => output.push_back(token.unwrap().clone()),
+            Some(Token::String(_)) => output.push_back(token.unwrap().clone()),
             Some(Token::Keyword(_)) => return Err(Err::Error((t, ErrorKind::IsNot))),
-            Some(Token::Special(_)) => output.push_back(&token.unwrap()),
+            Some(Token::Special(_)) => output.push_back(token.unwrap().clone()),
             Some(Token::Identifier(_)) => {
                 if let Some(Token::OpenParen) = input.iter().nth(0) {
                     // function invokation
-                    stack.push(&token.unwrap());
+                    stack.push(token.unwrap().clone());
                 } else {
                     // variable
-                    output.push_back(&token.unwrap());
+                    output.push_back(token.unwrap().clone());
                 }
             }
             Some(Token::Comma) => loop {
@@ -306,25 +313,49 @@ fn shunting_yard<'a>(
 
                 if let Some(Token::OpenParen) = stack.last() {
                     if let Some(top) = stack.pop() {
-                        output.push_back(&top);
+                        output.push_back(top.clone());
                         break;
                     } else {
                         return Err(Err::Error((t, ErrorKind::IsNot)));
                     }
                 }
             },
-            Some(Token::BinaryOp(op1)) => {
+            Some(Token::UnaryOp(_op)) => {
+                panic!("unary operator does not have textual representation.")
+            }
+            Some(Token::BinaryOp(_op)) => {
+                panic!("binary operator does not have textual representation.")
+            }
+            Some(Token::Op(op1)) => {
+                let mut binary_p = false;
+                match prev_token {
+                    Some(Token::Float(_)) if op1 == &"-" => binary_p = true,
+                    Some(_) => binary_p = true,
+                    None => (),
+                }
+
+                if !binary_p {
+                    let next_token = input.iter().nth(0);
+                    if input.len() > 0 {
+                        input = &input[1..]
+                    }
+                    output.push_back(next_token.unwrap().clone());
+                    output.push_back(Token::UnaryOp(op1));
+                    prev_token = Some(token.unwrap().clone());
+                    continue;
+                }
+
                 loop {
-                    if let Some(Token::BinaryOp(op2)) = stack.last() {
+                    if let Some(Token::Op(op2)) = stack.last() {
                         if let OperatorAssociativity::Left = operator_associativity(op1) {
                             if operator_precedence(op1) <= operator_precedence(op2) {
-                                output.push_back(&stack.pop().unwrap());
+                                output.push_back(Token::BinaryOp(op2));
                             } else {
                                 break;
                             }
                         } else {
                             if operator_precedence(op1) < operator_precedence(op2) {
-                                output.push_back(&stack.pop().unwrap());
+                                output.push_back(Token::BinaryOp(op2));
                             } else {
                                 break;
                             }
@@ -333,9 +364,9 @@ fn shunting_yard<'a>(
                         break;
                     }
                 }
-                stack.push(&token.unwrap());
+                stack.push(Token::BinaryOp(op1));
             }
-            Some(Token::OpenParen) => stack.push(&token.unwrap()),
+            Some(Token::OpenParen) => stack.push(token.unwrap().clone()),
             Some(Token::CloseParen) => loop {
                 let token = input.iter().nth(0);
                 if input.len() > 0 {
@@ -352,7 +383,7 @@ fn shunting_yard<'a>(
                     }
 
                     if let Some(Token::Identifier(_)) = token {
-                        output.push_back(&token.unwrap());
+                        output.push_back(token.unwrap().clone());
                         break;
                     } else {
                         return Err(Err::Error((t, ErrorKind::IsNot)));
@@ -377,13 +408,15 @@ fn shunting_yard<'a>(
                 if let Some(Token::OpenParen) | Some(Token::CloseParen) = stack.last() {
                     return Err(Err::Error((t, ErrorKind::IsNot)));
                 } else {
-                    output.push_back(stack.pop().unwrap())
+                    output.push_back(stack.pop().unwrap().clone())
                 }
             },
         };
+
+        prev_token = Some(token.unwrap().clone());
     }
 
-    return Ok((&input[..], output.into()));
+    return Ok((&input[..], Vec::from(output)));
 }
 
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
@@ -405,8 +438,15 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], AST> {
             Token::Special(name) => {
                 AST::Exp(Box::new(Exp::Variable(Box::new(Symbol(name.to_string())))))
             }
+            Token::UnaryOp(name) => {
+                if let Some(AST::Exp(exp)) = stack.pop() {
+                    AST::Exp(Box::new(Exp::UnaryOp(name.to_string(), exp)))
+                } else {
+                    return Err(Err::Error((rest, ErrorKind::IsNot)));
+                }
+            }
             Token::BinaryOp(name) => {
-                if let (Some(AST::Exp(exp1)), Some(AST::Exp(exp2))) = (stack.pop(), stack.pop()) {
+                if let (Some(AST::Exp(exp2)), Some(AST::Exp(exp1))) = (stack.pop(), stack.pop()) {
                     AST::Exp(Box::new(Exp::BinOp(name.to_string(), exp1, exp2)))
                 } else {
                     return Err(Err::Error((rest, ErrorKind::IsNot)));
@@ -457,6 +497,15 @@ mod test_tokenize {
         }
     }
 
+    fn test_tokenize_fn_ne(tokenize_fn: &TokenizeFn, unexpected: Token, input: &str) {
+        if let Ok(("", result)) = tokenize_fn(input) {
+            assert_ne!(unexpected, result);
+        } else {
+            println!("result = {:?}", tokenize_fn(input));
+            assert!(false);
+        }
+    }
+
     fn test_tokenize_fn_with_error(tokenize_fn: &TokenizeFn, input: &str) {
         if let Ok(("", _)) = tokenize_fn(input) {
             println!("result = {:?}", tokenize_fn(input));
@@ -496,17 +545,17 @@ mod test_tokenize {
     }
 
     #[test]
-    fn test_tokenize_binop() {
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("+"), "+");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("-"), "-");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("*"), "*");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("/"), "/");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("%"), "%");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("<"), "<");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp(">"), ">");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("<="), "<=");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp(">="), ">=");
-        test_tokenize_fn(&tokenize_binop, Token::BinaryOp("=="), "==");
+    fn test_tokenize_op() {
+        test_tokenize_fn(&tokenize_op, Token::Op("+"), "+");
+        test_tokenize_fn(&tokenize_op, Token::Op("-"), "-");
+        test_tokenize_fn(&tokenize_op, Token::Op("*"), "*");
+        test_tokenize_fn(&tokenize_op, Token::Op("/"), "/");
+        test_tokenize_fn(&tokenize_op, Token::Op("%"), "%");
+        test_tokenize_fn(&tokenize_op, Token::Op("<"), "<");
+        test_tokenize_fn(&tokenize_op, Token::Op(">"), ">");
+        test_tokenize_fn(&tokenize_op, Token::Op("<="), "<=");
+        test_tokenize_fn(&tokenize_op, Token::Op(">="), ">=");
+        test_tokenize_fn(&tokenize_op, Token::Op("=="), "==");
     }
 
     #[test]
@@ -545,11 +594,15 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize() {
-        test_tokenize_1(vec![Token::Float(-127.0)], "-127");
-        test_tokenize_1(vec![Token::Float(-127.0), Token::Float(127.0)], "-127 127");
+        test_tokenize_1(vec![Token::Op("-"), Token::Float(127.0)], "-127");
+        test_tokenize_1(
+            vec![Token::Op("-"), Token::Float(127.0), Token::Float(127.0)],
+            "-127 127",
+        );
         test_tokenize_1(
             vec![
-                Token::Float(-127.0),
+                Token::Op("-"),
+                Token::Float(127.0),
                 Token::Float(127.0),
                 Token::Special("now"),
                 Token::Float(0.0),
@@ -560,10 +613,10 @@ mod test_tokenize {
         test_tokenize_1(
             vec![
                 Token::Float(0.5),
-                Token::BinaryOp("*"),
+                Token::Op("*"),
                 Token::OpenParen,
                 Token::Float(1.0),
-                Token::BinaryOp("+"),
+                Token::Op("+"),
                 Token::Float(2.0),
                 Token::CloseParen,
             ],
@@ -573,7 +626,7 @@ mod test_tokenize {
         test_tokenize_1(
             vec![
                 Token::String("abc".to_string()),
-                Token::BinaryOp("+"),
+                Token::Op("+"),
                 Token::String("123".to_string()),
             ],
             "\"abc\" + \"123\"",
@@ -632,5 +685,31 @@ mod test_parse {
     #[test]
     fn test_parse() {
         test_parse_1(AST::Exp(Box::new(Exp::Float(0.0))), "0.0");
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::UnaryOp(
+                "-".to_string(),
+                Box::new(Exp::Float(1.0)),
+            ))),
+            "-1",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinOp(
+                "+".to_string(),
+                Box::new(Exp::Float(1.0)),
+                Box::new(Exp::Float(2.0)),
+            ))),
+            "1+2",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinOp(
+                "-".to_string(),
+                Box::new(Exp::Float(10.0)),
+                Box::new(Exp::Float(5.0)),
+            ))),
+            "10-5",
+        );
     }
 }
