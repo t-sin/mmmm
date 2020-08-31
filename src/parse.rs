@@ -317,15 +317,25 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
     result
 }
 
+fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
+    if state.input.len() == 0 {
+        return true;
+    }
+
+    match state.input.iter().nth(0).unwrap() {
+        Token::Keyword(_) => true,
+        Token::Comma => true,
+        Token::CloseParen => true,
+        Token::OpenBrace | Token::CloseBrace => true,
+        _ => false,
+    }
+}
+
 /// 操車場アルゴリズムでトークン列から式オブジェクトを構築する
 fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
-    while state.input.len() > 0 {
+    while !end_of_exp(state) {
         if let Err(err) = parse_exp_1(state) {
             return Err(err);
-        }
-
-        if let Some(Token::CloseParen) = state.prev_token {
-            break;
         }
     }
     if let Err(err) = terminate_parse_exp_1(state) {
