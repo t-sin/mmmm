@@ -118,6 +118,31 @@ fn parse_exp_1_identifier<'a>(
     Ok(())
 }
 
+fn parse_exp_1_subexp<'a>(
+    state: &mut ParseExpState<'a>,
+) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+    // precedes paren expression
+    let mut subexp_state = ParseExpState {
+        nest: state.nest + 1,
+        input: state.input,
+        output: Vec::new(),
+        stack: Vec::new(),
+        prev_token: None,
+    };
+
+    if let Err(err) = parse_exp(&mut subexp_state) {
+        return Err(err);
+    }
+
+    state.input = subexp_state.input;
+    state.prev_token = subexp_state.prev_token;
+    if let Some(exp) = subexp_state.output.pop() {
+        state.output.push(exp);
+    }
+
+    Ok(())
+}
+
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
     let token = state.input.iter().nth(0);
     if state.input.len() > 0 {
@@ -137,24 +162,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             parse_exp_1_identifier(name, state);
         }
         Some(Token::OpenParen) => {
-            // precedes paren expression
-            let mut subexp_state = ParseExpState {
-                nest: state.nest + 1,
-                input: state.input,
-                output: Vec::new(),
-                stack: Vec::new(),
-                prev_token: None,
-            };
-
-            if let Err(err) = parse_exp(&mut subexp_state) {
-                return Err(err);
-            }
-
-            state.input = subexp_state.input;
-            state.prev_token = subexp_state.prev_token;
-            if let Some(exp) = subexp_state.output.pop() {
-                state.output.push(exp);
-            }
+            parse_exp_1_subexp(state);
         }
         Some(Token::Op(op1)) => {
             let unary_p = match state.prev_token {
