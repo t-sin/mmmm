@@ -155,14 +155,16 @@ fn parse_exp_1_subexp<'a>(
 }
 
 fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
-    match prev_token {
-        Some(Token::Float(_)) if op == "-" => false,
-        Some(Token::Op("-")) if op == "-" => false,
-        Some(Token::Op(_)) if op == "-" => true,
-        Some(Token::OpenParen) if op == "-" => true,
-        Some(_) => false,
-        None if op == "-" => true,
-        None => false,
+    match op {
+        "-" => match prev_token {
+            Some(Token::Float(_)) => false,
+            Some(Token::Op("-")) => false,
+            Some(Token::Op(_)) => true,
+            Some(Token::OpenParen) => true,
+            Some(_) => false,
+            None => true,
+        },
+        _ => false,
     }
 }
 
