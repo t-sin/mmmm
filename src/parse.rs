@@ -580,11 +580,51 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
-                Box::new(Symbol("fnc".to_string())),
-                vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
+            AST::Exp(Box::new(Exp::BinaryOp(
+                "+".to_string(),
+                Box::new(Exp::InvokeFn(
+                    Box::new(Symbol("fn1".to_string())),
+                    vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
+                )),
+                Box::new(Exp::InvokeFn(
+                    Box::new(Symbol("fn2".to_string())),
+                    vec![Exp::Float(1.0)],
+                )),
             ))),
             "fn1(1,2,3) + fn2(1)",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("f1".to_string())),
+                vec![Exp::InvokeFn(
+                    Box::new(Symbol("f2".to_string())),
+                    vec![Exp::Float(42.0)],
+                )],
+            ))),
+            "f1(f2(42))",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("f1".to_string())),
+                vec![
+                    Exp::InvokeFn(Box::new(Symbol("f2".to_string())), vec![Exp::Float(10.0)]),
+                    Exp::InvokeFn(Box::new(Symbol("f3".to_string())), vec![Exp::Float(20.0)]),
+                ],
+            ))),
+            "f1(f2(10), f3(20))",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("f1".to_string())),
+                vec![
+                    Exp::InvokeFn(Box::new(Symbol("f2".to_string())), vec![Exp::Float(10.0)]),
+                    Exp::InvokeFn(Box::new(Symbol("f3".to_string())), vec![Exp::Float(20.0)]),
+                ],
+            ))),
+            "f1(f2(10), f3(20))",
         );
     }
 }
