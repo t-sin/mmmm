@@ -14,7 +14,7 @@ pub enum Exp {
     Variable(Box<Symbol>),
     InvokeFn(Box<Symbol>, Vec<Exp>),
     UnaryOp(String, Box<Exp>),
-    BinOp(String, Box<Exp>, Box<Exp>),
+    BinaryOp(String, Box<Exp>, Box<Exp>),
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
 
@@ -95,9 +95,11 @@ fn terminate_parse_exp_1<'a>(
     match state.stack.pop() {
         Some(Token::Op(op)) => {
             if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
-                state
-                    .output
-                    .push(Exp::BinOp(op.to_string(), Box::new(exp1), Box::new(exp2)));
+                state.output.push(Exp::BinaryOp(
+                    op.to_string(),
+                    Box::new(exp1),
+                    Box::new(exp2),
+                ));
             } else {
                 return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
             }
@@ -201,9 +203,11 @@ fn parse_exp_1_op<'a>(
                 if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
                     (state.stack.pop(), state.output.pop(), state.output.pop())
                 {
-                    state
-                        .output
-                        .push(Exp::BinOp(op.to_string(), Box::new(exp1), Box::new(exp2)));
+                    state.output.push(Exp::BinaryOp(
+                        op.to_string(),
+                        Box::new(exp1),
+                        Box::new(exp2),
+                    ));
                 } else {
                     return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
                 }
@@ -380,7 +384,7 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "+".to_string(),
                 Box::new(Exp::Float(1.0)),
                 Box::new(Exp::Float(2.0)),
@@ -389,7 +393,7 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "-".to_string(),
                 Box::new(Exp::Float(10.0)),
                 Box::new(Exp::Float(5.0)),
@@ -398,7 +402,7 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "-".to_string(),
                 Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(1.0)))),
                 Box::new(Exp::Float(2.0)),
@@ -407,7 +411,7 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
                 Box::new(Exp::Float(42.0)),
                 Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(1.0)))),
@@ -416,9 +420,9 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "+".to_string(),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
@@ -429,9 +433,9 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "-".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "+".to_string(),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
@@ -442,11 +446,11 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "+".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "-".to_string(),
-                    Box::new(Exp::BinOp(
+                    Box::new(Exp::BinaryOp(
                         "+".to_string(),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::Float(2.0)),
@@ -459,14 +463,14 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "+".to_string(),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "-".to_string(),
                     Box::new(Exp::Float(3.0)),
                     Box::new(Exp::Float(4.0)),
@@ -476,11 +480,11 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "-".to_string(),
-                    Box::new(Exp::BinOp(
+                    Box::new(Exp::BinaryOp(
                         "+".to_string(),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(2.0)))),
@@ -493,12 +497,12 @@ mod test_parse {
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinOp(
+            AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
-                Box::new(Exp::BinOp(
+                Box::new(Exp::BinaryOp(
                     "+".to_string(),
                     Box::new(Exp::Float(1.0)),
-                    Box::new(Exp::BinOp(
+                    Box::new(Exp::BinaryOp(
                         "-".to_string(),
                         Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(2.0)))),
                         Box::new(Exp::Float(3.0)),
