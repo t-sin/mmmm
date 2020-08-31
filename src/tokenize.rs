@@ -218,15 +218,6 @@ mod test_tokenize {
         }
     }
 
-    fn test_tokenize_fn_ne(tokenize_fn: &TokenizeFn, unexpected: Token, input: &str) {
-        if let Ok(("", result)) = tokenize_fn(input) {
-            assert_ne!(unexpected, result);
-        } else {
-            println!("result = {:?}", tokenize_fn(input));
-            assert!(false);
-        }
-    }
-
     fn test_tokenize_fn_with_error(tokenize_fn: &TokenizeFn, input: &str) {
         if let Ok(("", _)) = tokenize_fn(input) {
             println!("result = {:?}", tokenize_fn(input));
