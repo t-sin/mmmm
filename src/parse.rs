@@ -83,9 +83,56 @@ struct ParseExpState<'a> {
 }
 
 fn parse_args<'a>(
-    _state: &mut ParseExpState<'a>,
+    state: &mut ParseExpState<'a>,
 ) -> Result<Vec<Exp>, Err<(&'a [Token<'a>], ErrorKind)>> {
-    let args = Vec::new();
+    let mut args = Vec::new();
+    let mut separated = false;
+
+    loop {
+        match state.input.iter().nth(0) {
+            Some(Token::OpenParen) => {
+                state.input = &state.input[1..];
+                state.prev_token = Some(Token::OpenParen);
+                separated = true;
+            }
+            Some(Token::CloseParen) => {
+                state.input = &state.input[1..];
+                state.prev_token = Some(Token::CloseParen);
+                break;
+            }
+            Some(Token::Comma) => {
+                separated = true;
+                state.input = &state.input[1..];
+                state.prev_token = Some(Token::Comma)
+            }
+            Some(_) => (),
+            None => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        }
+
+        if separated {
+            let mut arg_state = ParseExpState {
+                nest: state.nest + 1,
+                input: state.input,
+                output: Vec::new(),
+                stack: Vec::new(),
+                prev_token: None,
+            };
+
+            if let Err(err) = parse_exp_1(&mut arg_state) {
+                return Err(err);
+            } else {
+                if let Some(exp) = arg_state.output.pop() {
+                    args.push(exp);
+                    separated = false;
+                } else {
+                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                }
+            }
+            state.input = arg_state.input;
+            state.prev_token = arg_state.prev_token;
+        }
+    }
+
     Ok(args)
 }
 
@@ -235,7 +282,6 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             Ok(())
         }
         Some(Token::Keyword(_)) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        Some(Token::Comma) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Special(name)) => {
             state
                 .output
@@ -255,6 +301,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         | Some(Token::FnReturnType)
         | Some(Token::Assign)
         | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Comma) => Ok(()),
         Some(Token::Newline) | Some(Token::CloseParen) | None => terminate_parse_exp_1(state),
     };
 
@@ -302,10 +349,7 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
                 Ok((state.input, None))
             }
         }
-        Err(err) => {
-            println!("{:?}", err);
-            Err(err)
-        }
+        Err(err) => Err(err),
     }
 }
 
@@ -508,6 +552,14 @@ mod test_parse {
                 Box::new(Exp::Float(4.0)),
             ))),
             "(1+(-2-3))*4",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("fnc".to_string())),
+                vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
+            ))),
+            "fnc(1,2,3)",
         );
     }
 }
