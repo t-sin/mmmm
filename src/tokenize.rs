@@ -1,7 +1,9 @@
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
-use nom::character::complete::{char, digit1, multispace0, newline, none_of, one_of};
-use nom::combinator::opt;
+use nom::character::complete::{
+    char, digit1, multispace0, newline, none_of, one_of, space0, space1,
+};
+use nom::combinator::{all_consuming, opt};
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
@@ -68,20 +70,26 @@ fn tokenize_float(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
-    let (s, name) = alt((
-        tag("fn"),
-        tag("return"),
-        tag("if"),
-        tag("else"),
-        tag("float"),
-        tag("void"),
+    let (s, (name, _)) = permutation((
+        alt((
+            tag("fn"),
+            tag("return"),
+            tag("if"),
+            tag("else"),
+            tag("float"),
+            tag("void"),
+        )),
+        alt((space1, all_consuming(space0))),
     ))(s)?;
     Ok((s, Token::Keyword(name)))
 }
 
 fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
-    let (s, op) = alt((tag("now"), tag("self")))(s)?;
-    Ok((s, Token::Special(op)))
+    let (s, (name, _)) = permutation((
+        alt((tag("now"), tag("self"))),
+        alt((space1, all_consuming(space0))),
+    ))(s)?;
+    Ok((s, Token::Special(name)))
 }
 
 fn tokenize_op(s: &str) -> IResult<&str, Token> {
