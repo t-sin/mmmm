@@ -279,12 +279,6 @@ fn parse_args<'a>(
 fn terminate_parse_exp_1<'a>(
     state: &mut ParseExpState<'a>,
 ) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
-    // if let Some(Token::CloseParen) = state.prev_token {
-    //     if state.input.len() > 0 {
-    //         state.input = &state.input[1..];
-    //     }
-    // }
-
     match state.stack.pop() {
         Some(Token::Op(op)) => {
             if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
@@ -307,7 +301,6 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
     if state.input.len() > 0 {
         state.input = &state.input[1..];
     }
-    println!("{:?}", state);
 
     match token {
         Some(Token::CloseBrace) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
@@ -348,9 +341,6 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             if let Err(err) = parse_exp(&mut subexp_state) {
                 return Err(err);
             }
-            // if let Err(err) = terminate_parse_exp_1(&mut subexp_state) {
-            //     return Err(err);
-            // }
 
             state.input = subexp_state.input;
             state.prev_token = subexp_state.prev_token;
