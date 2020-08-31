@@ -2,6 +2,7 @@ extern crate clap;
 extern crate nom;
 
 mod parse;
+mod tokenize;
 
 use std::fs::File;
 use std::io::prelude::*;
@@ -33,7 +34,7 @@ fn main() {
     };
     let input = &input;
 
-    match parse::tokenize(input) {
+    match tokenize::tokenize(input) {
         Ok((_, tokens)) => {
             println!("parsed: {:?}", tokens);
             let ast = parse::parse(&tokens);
