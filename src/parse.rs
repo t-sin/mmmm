@@ -336,8 +336,24 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         }
         Some(Token::OpenParen) => {
             // precedes paren expression
-            if let Err(err) = parse_exp(state) {
+            let mut subexp_state = ParseExpState {
+                input: state.input,
+                output: Vec::new(),
+                stack: Vec::new(),
+                prev_token: None,
+            };
+
+            if let Err(err) = parse_exp(&mut subexp_state) {
                 return Err(err);
+            }
+            // if let Err(err) = terminate_parse_exp_1(&mut subexp_state) {
+            //     return Err(err);
+            // }
+
+            state.input = subexp_state.input;
+            state.prev_token = subexp_state.prev_token;
+            if let Some(exp) = subexp_state.output.pop() {
+                state.output.push(exp);
             }
         }
         Some(Token::Op(op1)) => {
@@ -424,6 +440,10 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
     while state.input.len() > 0 {
         if let Err(err) = parse_exp_1(state) {
             return Err(err);
+        }
+
+        if let Some(Token::CloseParen) = state.prev_token {
+            break;
         }
     }
     if let Err(err) = terminate_parse_exp_1(state) {
