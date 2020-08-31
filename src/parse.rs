@@ -3,9 +3,11 @@ use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq)]
+/// Represents mmmm's identifier
 pub struct Symbol(String);
 
 #[derive(Debug, PartialEq)]
+/// Represents mmmm's expressions.
 pub enum Exp {
     Float(f64),
     String(String),
@@ -17,17 +19,21 @@ pub enum Exp {
 }
 
 #[derive(Debug, PartialEq)]
+/// Represents mmmm's abstruct syntax tree.
+///
+/// Note: Now can parse only expressions.
 pub enum AST {
     Exp(Box<Exp>),
 }
 
+/// Represents mmmm's operator associativity.
 enum OperatorAssociativity {
     Left,
     Right,
     None,
 }
 
-/// 演算子の結合性を与える
+/// Gives associativity to the specified operator name.
 fn operator_associativity(op: &str) -> OperatorAssociativity {
     match op {
         "[]" | "()" => OperatorAssociativity::None,
@@ -41,9 +47,9 @@ fn operator_associativity(op: &str) -> OperatorAssociativity {
     }
 }
 
-/// 演算子の優先順位を与える
+/// Gives a number of operator precedence to the specified operator name.
 ///
-/// 数が小さいほうが優先度が高い
+/// Lesser operator precedence number means the operators has greater precedence.
 fn operator_precedence(op: &str) -> i32 {
     match op {
         "[]" | "()" => 1, // 後置演算子
@@ -60,11 +66,19 @@ fn operator_precedence(op: &str) -> i32 {
 }
 
 #[derive(Debug)]
+/// Structures for the state of expression parsing.
+///
+/// This structure's state is a state for modified shunting yard algorithm.
 struct ParseExpState<'a> {
-    nest: u32, // for debug
+    /// A number of nesting of parse_exp_1. It's for debugging.
+    nest: u32,
+    /// A rest of inputs
     input: &'a [Token<'a>],
+    /// An output queue.
     output: Vec<Exp>,
+    /// An operator stack.
     stack: Vec<Token<'a>>,
+    /// A token for the previous parse_exp_1.
     prev_token: Option<Token<'a>>,
 }
 
