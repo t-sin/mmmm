@@ -118,7 +118,7 @@ fn parse_funcall_args<'a>(
                 prev_token: None,
             };
 
-            if let Err(err) = parse_exp_1(&mut arg_state) {
+            if let Err(err) = parse_exp(&mut arg_state) {
                 return Err(err);
             } else {
                 if let Some(exp) = arg_state.output.pop() {
