@@ -82,7 +82,7 @@ struct ParseExpState<'a> {
     prev_token: Option<Token<'a>>,
 }
 
-fn parse_args<'a>(
+fn parse_funcall_args<'a>(
     state: &mut ParseExpState<'a>,
 ) -> Result<Vec<Exp>, Err<(&'a [Token<'a>], ErrorKind)>> {
     let mut args = Vec::new();
@@ -161,7 +161,7 @@ fn parse_exp_1_identifier<'a>(
 ) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
     if let Some(Token::OpenParen) = state.input.iter().nth(0) {
         // function invokation
-        let args = match parse_args(state) {
+        let args = match parse_funcall_args(state) {
             Ok(args) => args,
             Err(err) => return Err(err),
         };
