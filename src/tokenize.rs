@@ -287,11 +287,30 @@ mod test_tokenize {
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("void"), "void");
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("float"), "float");
     }
+    #[test]
+    fn test_tokenize_keyword_including_identifier() {
+        if let Ok(("1", Token::Keyword("fn"))) = tokenize_keyword("fn1") {
+            assert!(false)
+        } else {
+            assert!(true)
+        }
+    }
 
     #[test]
     fn test_tokenize_special_variable() {
         test_tokenize_fn(&tokenize_special_variable, Token::Special("now"), "now");
         test_tokenize_fn(&tokenize_special_variable, Token::Special("self"), "self");
+
+        test_tokenize_fn_with_error(&tokenize_keyword, "self_hoge");
+    }
+
+    #[test]
+    fn test_tokenize_special_variables_including_identifier() {
+        if let Ok(("now", Token::Keyword("now"))) = tokenize_keyword("nownow") {
+            assert!(false)
+        } else {
+            assert!(true)
+        }
     }
 
     #[test]
