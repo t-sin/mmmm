@@ -95,11 +95,8 @@ fn terminate_parse_exp_1<'a>(
     match state.stack.pop() {
         Some(Token::Op(op)) => {
             if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
-                state.output.push(Exp::BinaryOp(
-                    op.to_string(),
-                    Box::new(exp1),
-                    Box::new(exp2),
-                ));
+                let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
+                state.output.push(exp);
             } else {
                 return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
             }
@@ -121,14 +118,12 @@ fn parse_exp_1_identifier<'a>(
             Ok(args) => args,
             Err(err) => return Err(err),
         };
-        state
-            .output
-            .push(Exp::InvokeFn(Box::new(Symbol(name.to_string())), args));
+        let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
+        state.output.push(exp);
     } else {
         // variable
-        state
-            .output
-            .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
+        let exp = Exp::Variable(Box::new(Symbol(name.to_string())));
+        state.output.push(exp);
     }
 
     Ok(())
