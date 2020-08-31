@@ -230,6 +230,7 @@ enum OperatorAssociativity {
     None,
 }
 
+/// 演算子の結合性を与える
 fn operator_associativity(op: &str) -> OperatorAssociativity {
     match op {
         "[]" | "()" => OperatorAssociativity::None,
@@ -243,7 +244,7 @@ fn operator_associativity(op: &str) -> OperatorAssociativity {
     }
 }
 
-/// 演算子の優先順位を決定する
+/// 演算子の優先順位を与える
 ///
 /// 数が小さいほうが優先度が高い
 fn operator_precedence(op: &str) -> i32 {
