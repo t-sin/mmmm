@@ -192,13 +192,16 @@ fn parse_exp_1_subexp<'a>(
         return Err(err);
     }
 
-    state.input = subexp_state.input;
-    state.prev_token = subexp_state.prev_token;
-    if let Some(exp) = subexp_state.output.pop() {
-        state.output.push(exp);
+    if let Some(Token::CloseParen) = subexp_state.input.iter().nth(0) {
+        if let Some(exp) = subexp_state.output.pop() {
+            state.output.push(exp);
+        }
+        state.input = &subexp_state.input[1..];
+        state.prev_token = Some(Token::CloseParen);
+        Ok(())
+    } else {
+        Err(Err::Error((&subexp_state.input[..], ErrorKind::IsNot)))
     }
-
-    Ok(())
 }
 
 fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
