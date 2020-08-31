@@ -1,5 +1,3 @@
-use std::collections::VecDeque;
-
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::tag;
 use nom::character::complete::{char, digit1, multispace0, newline, none_of, one_of};
@@ -265,7 +263,7 @@ fn operator_precedence(op: &str) -> i32 {
 #[derive(Debug)]
 struct ParseExpState<'a> {
     input: &'a [Token<'a>],
-    output: VecDeque<Exp>,
+    output: Vec<Exp>,
     stack: Vec<Token<'a>>,
     prev_token: Option<Token<'a>>,
 }
@@ -288,10 +286,10 @@ fn terminate_parse_exp_1<'a>(
 
     match state.stack.pop() {
         Some(Token::Op(op)) => {
-            if let (Some(exp2), Some(exp1)) = (state.output.pop_back(), state.output.pop_back()) {
+            if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
                 state
                     .output
-                    .push_back(Exp::BinOp(op.to_string(), Box::new(exp1), Box::new(exp2)));
+                    .push(Exp::BinOp(op.to_string(), Box::new(exp1), Box::new(exp2)));
             } else {
                 return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
             }
@@ -312,13 +310,13 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
 
     match token {
         Some(Token::CloseBrace) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        Some(Token::Float(f)) => state.output.push_back(Exp::Float(*f)),
-        Some(Token::String(s)) => state.output.push_back(Exp::String(s.to_string())),
+        Some(Token::Float(f)) => state.output.push(Exp::Float(*f)),
+        Some(Token::String(s)) => state.output.push(Exp::String(s.to_string())),
         Some(Token::Keyword(_)) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Comma) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Special(name)) => state
             .output
-            .push_back(Exp::Variable(Box::new(Symbol(name.to_string())))),
+            .push(Exp::Variable(Box::new(Symbol(name.to_string())))),
         Some(Token::Identifier(name)) => {
             if let Some(Token::OpenParen) = state.input.iter().nth(0) {
                 // function invokation
@@ -328,12 +326,12 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
                 };
                 state
                     .output
-                    .push_back(Exp::InvokeFn(Box::new(Symbol(name.to_string())), args));
+                    .push(Exp::InvokeFn(Box::new(Symbol(name.to_string())), args));
             } else {
                 // variable
                 state
                     .output
-                    .push_back(Exp::Variable(Box::new(Symbol(name.to_string()))));
+                    .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
             }
         }
         Some(Token::OpenParen) => {
@@ -358,9 +356,9 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
                 if let Err(err) = parse_exp_1(state) {
                     return Err(err);
                 } else {
-                    if let Some(exp) = state.output.pop_back() {
+                    if let Some(exp) = state.output.pop() {
                         let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
-                        state.output.push_back(exp);
+                        state.output.push(exp);
                     } else {
                         return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
                     }
@@ -378,12 +376,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
                             }
                         }
 
-                        if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) = (
-                            state.stack.pop(),
-                            state.output.pop_back(),
-                            state.output.pop_back(),
-                        ) {
-                            state.output.push_back(Exp::BinOp(
+                        if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
+                            (state.stack.pop(), state.output.pop(), state.output.pop())
+                        {
+                            state.output.push(Exp::BinOp(
                                 op.to_string(),
                                 Box::new(exp1),
                                 Box::new(exp2),
@@ -440,14 +436,14 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
     let mut state = ParseExpState {
         input: t,
-        output: VecDeque::new(),
+        output: Vec::new(),
         stack: Vec::new(),
         prev_token: None,
     };
 
     match parse_exp(&mut state) {
         Ok(()) => {
-            if let Some(exp) = state.output.pop_back() {
+            if let Some(exp) = state.output.pop() {
                 Ok((state.input, Some(AST::Exp(Box::new(exp)))))
             } else {
                 Ok((state.input, None))
