@@ -280,6 +280,12 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             state.output.push(Exp::Float(*f));
             Ok(())
         }
+        Some(Token::LineComment(_)) => {
+            // now simply discards comment token
+            state.input = &state.input[1..];
+            // state.prev_token = Some(token.unwrap().clone());
+            Ok(())
+        }
         Some(Token::String(s)) => {
             state.output.push(Exp::String(s.to_string()));
             Ok(())

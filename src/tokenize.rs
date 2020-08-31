@@ -1,5 +1,5 @@
 use nom::branch::{alt, permutation};
-use nom::bytes::complete::tag;
+use nom::bytes::complete::{is_not, tag};
 use nom::character::complete::{
     char, digit1, multispace0, newline, none_of, one_of, space0, space1,
 };
@@ -28,6 +28,7 @@ pub enum Token<'a> {
     Assign,
     TimeAt,
     Newline,
+    LineComment(String),
 }
 
 fn tokenize_int(s: &str) -> IResult<&str, f64> {
@@ -178,6 +179,12 @@ fn tokenize_newline(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::Newline))
 }
 
+fn tokenize_line_comment(s: &str) -> IResult<&str, Token> {
+    let (s, (_, comment, _)) = permutation((tag("//"), many0(is_not("\n")), opt(newline)))(s)?;
+    let comment: String = comment.into_iter().collect();
+    Ok((s, Token::LineComment(comment)))
+}
+
 pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     let mut tokens = Vec::new();
     let mut input = s;
@@ -191,6 +198,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
         }
 
         let (s, token) = alt((
+            tokenize_line_comment,
             tokenize_float,
             tokenize_fn_return_type,
             tokenize_op,
