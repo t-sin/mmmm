@@ -95,6 +95,29 @@ fn terminate_parse_exp_1<'a>(
     Ok(())
 }
 
+fn parse_exp_1_identifier<'a>(
+    name: &String,
+    state: &mut ParseExpState<'a>,
+) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+    if let Some(Token::OpenParen) = state.input.iter().nth(0) {
+        // function invokation
+        let args = match parse_args(state) {
+            Ok(args) => args,
+            Err(err) => return Err(err),
+        };
+        state
+            .output
+            .push(Exp::InvokeFn(Box::new(Symbol(name.to_string())), args));
+    } else {
+        // variable
+        state
+            .output
+            .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
+    }
+
+    Ok(())
+}
+
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
     let token = state.input.iter().nth(0);
     if state.input.len() > 0 {
@@ -111,21 +134,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             .output
             .push(Exp::Variable(Box::new(Symbol(name.to_string())))),
         Some(Token::Identifier(name)) => {
-            if let Some(Token::OpenParen) = state.input.iter().nth(0) {
-                // function invokation
-                let args = match parse_args(state) {
-                    Ok(args) => args,
-                    Err(err) => return Err(err),
-                };
-                state
-                    .output
-                    .push(Exp::InvokeFn(Box::new(Symbol(name.to_string())), args));
-            } else {
-                // variable
-                state
-                    .output
-                    .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
-            }
+            parse_exp_1_identifier(name, state);
         }
         Some(Token::OpenParen) => {
             // precedes paren expression
