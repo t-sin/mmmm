@@ -262,6 +262,7 @@ fn operator_precedence(op: &str) -> i32 {
 
 #[derive(Debug)]
 struct ParseExpState<'a> {
+    nest: u32, // for debug
     input: &'a [Token<'a>],
     output: Vec<Exp>,
     stack: Vec<Token<'a>>,
@@ -337,6 +338,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         Some(Token::OpenParen) => {
             // precedes paren expression
             let mut subexp_state = ParseExpState {
+                nest: state.nest + 1,
                 input: state.input,
                 output: Vec::new(),
                 stack: Vec::new(),
@@ -455,6 +457,7 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
 
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
     let mut state = ParseExpState {
+        nest: 0,
         input: t,
         output: Vec::new(),
         stack: Vec::new(),
