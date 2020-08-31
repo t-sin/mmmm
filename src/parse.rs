@@ -413,7 +413,7 @@ mod test_parse {
     }
 
     #[test]
-    fn test_parse() {
+    fn test_single_term() {
         test_parse_1(AST::Exp(Box::new(Exp::Float(0.0))), "0.0");
 
         test_parse_1(
@@ -423,7 +423,10 @@ mod test_parse {
             ))),
             "-1",
         );
+    }
 
+    #[test]
+    fn test_binary_operators() {
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
                 "+".to_string(),
@@ -459,7 +462,10 @@ mod test_parse {
             ))),
             "42*-1",
         );
+    }
 
+    #[test]
+    fn test_nested_expressions() {
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
                 "*".to_string(),
@@ -553,6 +559,17 @@ mod test_parse {
             ))),
             "(1+(-2-3))*4",
         );
+    }
+
+    #[test]
+    fn test_function_call() {
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("fnc".to_string())),
+                vec![Exp::Float(1.0)],
+            ))),
+            "fnc(1)",
+        );
 
         test_parse_1(
             AST::Exp(Box::new(Exp::InvokeFn(
@@ -560,6 +577,14 @@ mod test_parse {
                 vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
             ))),
             "fnc(1,2,3)",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("fnc".to_string())),
+                vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
+            ))),
+            "fn1(1,2,3) + fn2(1)",
         );
     }
 }
