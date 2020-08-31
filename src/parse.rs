@@ -223,39 +223,39 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         state.input = &state.input[1..];
     }
 
-    match token {
-        Some(Token::CloseBrace) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        Some(Token::Float(f)) => state.output.push(Exp::Float(*f)),
-        Some(Token::String(s)) => state.output.push(Exp::String(s.to_string())),
-        Some(Token::Keyword(_)) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        Some(Token::Comma) => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        Some(Token::Special(name)) => state
-            .output
-            .push(Exp::Variable(Box::new(Symbol(name.to_string())))),
-        Some(Token::Identifier(name)) => {
-            parse_exp_1_identifier(name, state);
+    let result = match token {
+        Some(Token::CloseBrace) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Float(f)) => {
+            state.output.push(Exp::Float(*f));
+            Ok(())
         }
-        Some(Token::OpenParen) => {
-            parse_exp_1_subexp(state);
+        Some(Token::String(s)) => {
+            state.output.push(Exp::String(s.to_string()));
+            Ok(())
         }
+        Some(Token::Keyword(_)) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Comma) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Special(name)) => {
+            state
+                .output
+                .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
+            Ok(())
+        }
+        Some(Token::Identifier(name)) => parse_exp_1_identifier(name, state),
+        Some(Token::OpenParen) => parse_exp_1_subexp(state),
         Some(Token::Op(op1)) => {
-            parse_exp_1_op(op1, Some(token.unwrap().clone()), state);
+            let result = parse_exp_1_op(op1, Some(token.unwrap().clone()), state);
             state.prev_token = Some(token.unwrap().clone());
+            result
         }
         Some(Token::OpenBrace)
         | Some(Token::OpenBracket)
         | Some(Token::CloseBracket)
         | Some(Token::FnReturnType)
         | Some(Token::Assign)
-        | Some(Token::TimeAt) => {
-            return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
-        }
-        Some(Token::Newline) | Some(Token::CloseParen) | None => {
-            if let Err(err) = terminate_parse_exp_1(state) {
-                return Err(err);
-            }
-        }
-    }
+        | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Newline) | Some(Token::CloseParen) | None => terminate_parse_exp_1(state),
+    };
 
     state.prev_token = if let Some(token) = token {
         Some(token.clone())
@@ -263,7 +263,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         None
     };
 
-    Ok(())
+    result
 }
 
 /// 操車場アルゴリズムでトークン列から式オブジェクトを構築する
