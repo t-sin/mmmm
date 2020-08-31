@@ -143,6 +143,66 @@ fn parse_exp_1_subexp<'a>(
     Ok(())
 }
 
+fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
+    match prev_token {
+        Some(Token::Float(_)) if op == "-" => false,
+        Some(Token::Op("-")) if op == "-" => false,
+        Some(Token::Op(_)) if op == "-" => true,
+        Some(Token::OpenParen) if op == "-" => true,
+        Some(_) => false,
+        None if op == "-" => true,
+        None => false,
+    }
+}
+
+fn parse_exp_1_op<'a>(
+    op1: &str,
+    token: Option<Token<'a>>,
+    state: &mut ParseExpState<'a>,
+) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+    if is_unary(op1, state.prev_token.clone()) {
+        if let Err(err) = parse_exp_1(state) {
+            return Err(err);
+        } else {
+            if let Some(exp) = state.output.pop() {
+                let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
+                state.output.push(exp);
+            } else {
+                return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+            }
+        }
+    } else {
+        loop {
+            if let Some(Token::Op(op2)) = state.stack.last() {
+                if let OperatorAssociativity::Left = operator_associativity(op1) {
+                    if operator_precedence(op1) > operator_precedence(op2) {
+                        break;
+                    }
+                } else {
+                    if operator_precedence(op1) >= operator_precedence(op2) {
+                        break;
+                    }
+                }
+
+                if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
+                    (state.stack.pop(), state.output.pop(), state.output.pop())
+                {
+                    state
+                        .output
+                        .push(Exp::BinOp(op.to_string(), Box::new(exp1), Box::new(exp2)));
+                } else {
+                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                }
+            } else {
+                break;
+            }
+        }
+        state.stack.push(token.unwrap().clone());
+    }
+
+    Ok(())
+}
+
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
     let token = state.input.iter().nth(0);
     if state.input.len() > 0 {
@@ -165,59 +225,8 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             parse_exp_1_subexp(state);
         }
         Some(Token::Op(op1)) => {
-            let unary_p = match state.prev_token {
-                Some(Token::Float(_)) if op1 == &"-" => false,
-                Some(Token::Op("-")) if op1 == &"-" => false,
-                Some(Token::Op(_)) if op1 == &"-" => true,
-                Some(Token::OpenParen) if op1 == &"-" => true,
-                Some(_) => false,
-                None if op1 == &"-" => true,
-                None => false,
-            };
-
-            if unary_p {
-                state.prev_token = Some(token.unwrap().clone());
-                if let Err(err) = parse_exp_1(state) {
-                    return Err(err);
-                } else {
-                    if let Some(exp) = state.output.pop() {
-                        let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
-                        state.output.push(exp);
-                    } else {
-                        return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
-                    }
-                }
-            } else {
-                loop {
-                    if let Some(Token::Op(op2)) = state.stack.last() {
-                        if let OperatorAssociativity::Left = operator_associativity(op1) {
-                            if operator_precedence(op1) > operator_precedence(op2) {
-                                break;
-                            }
-                        } else {
-                            if operator_precedence(op1) >= operator_precedence(op2) {
-                                break;
-                            }
-                        }
-
-                        if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
-                            (state.stack.pop(), state.output.pop(), state.output.pop())
-                        {
-                            state.output.push(Exp::BinOp(
-                                op.to_string(),
-                                Box::new(exp1),
-                                Box::new(exp2),
-                            ));
-                        } else {
-                            return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
-                        }
-                    } else {
-                        break;
-                    }
-                }
-                state.stack.push(token.unwrap().clone());
-                state.prev_token = Some(token.unwrap().clone());
-            }
+            parse_exp_1_op(op1, Some(token.unwrap().clone()), state);
+            state.prev_token = Some(token.unwrap().clone());
         }
         Some(Token::OpenBrace)
         | Some(Token::OpenBracket)
