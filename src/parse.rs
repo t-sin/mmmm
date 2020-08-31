@@ -626,5 +626,36 @@ mod test_parse {
             ))),
             "f1(f2(10), f3(20))",
         );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("f1".to_string())),
+                vec![Exp::BinaryOp(
+                    "+".to_string(),
+                    Box::new(Exp::Float(1.0)),
+                    Box::new(Exp::Float(2.0)),
+                )],
+            ))),
+            "f1(1+2)",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::InvokeFn(
+                Box::new(Symbol("f1".to_string())),
+                vec![
+                    Exp::BinaryOp(
+                        "+".to_string(),
+                        Box::new(Exp::Float(1.0)),
+                        Box::new(Exp::Float(2.0)),
+                    ),
+                    Exp::BinaryOp(
+                        "*".to_string(),
+                        Box::new(Exp::Float(3.0)),
+                        Box::new(Exp::Float(4.0)),
+                    ),
+                ],
+            ))),
+            "f1(1+2, 3*4)",
+        );
     }
 }
