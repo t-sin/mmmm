@@ -765,6 +765,23 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinOp(
+                "+".to_string(),
+                Box::new(Exp::BinOp(
+                    "-".to_string(),
+                    Box::new(Exp::BinOp(
+                        "+".to_string(),
+                        Box::new(Exp::Float(1.0)),
+                        Box::new(Exp::Float(2.0)),
+                    )),
+                    Box::new(Exp::Float(3.0)),
+                )),
+                Box::new(Exp::Float(4.0)),
+            ))),
+            "1+2-3+4", // ((1+2)-3)+4
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinOp(
                 "*".to_string(),
                 Box::new(Exp::BinOp(
                     "+".to_string(),
