@@ -332,6 +332,7 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
     match state.input.iter().nth(0).unwrap() {
         Token::Keyword(_) => true,
         Token::Comma => true,
+        Token::Newline => true,
         Token::CloseParen => true,
         Token::OpenBrace | Token::CloseBrace => true,
         _ => false,
@@ -345,8 +346,13 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
             return Err(err);
         }
     }
+
     if let Err(err) = terminate_parse_exp_1(state) {
         return Err(err);
+    }
+
+    if let Some(Token::Newline) = state.input.iter().nth(0) {
+        state.input = &state.input[1..];
     }
 
     Ok(())
