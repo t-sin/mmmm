@@ -180,12 +180,12 @@ fn tokenize_identifier(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_newline(s: &str) -> IResult<&str, Token> {
-    let (s, _) = newline(s)?;
+    let (s, _) = line_ending(s)?;
     Ok((s, Token::Newline))
 }
 
 fn tokenize_line_comment(s: &str) -> IResult<&str, Token> {
-    let (s, (_, comment, _)) = permutation((tag("//"), many0(is_not("\n")), opt(newline)))(s)?;
+    let (s, (_, comment, _)) = permutation((tag("//"), many0(is_not("\n")), opt(line_ending)))(s)?;
     let comment: String = comment.into_iter().collect();
     Ok((s, Token::LineComment(comment)))
 }
