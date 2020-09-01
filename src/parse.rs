@@ -3,7 +3,6 @@ use nom::combinator::rest_len;
 use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
-#[derive(Debug, PartialEq)]
 fn token_type_of<'a>(
     token: Token<'a>,
 ) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
@@ -21,10 +20,11 @@ fn token_type_of<'a>(
     }
 }
 
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's identifier
 pub struct Symbol(String);
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's expressions.
 pub enum Exp {
     Float(f64),
