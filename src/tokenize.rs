@@ -15,6 +15,7 @@ pub enum Token<'a> {
     Op(&'a str),
     Identifier(String),
     String(String),
+    LineComment(String),
     Comma,
     Colon,
     OpenParen,
@@ -27,7 +28,87 @@ pub enum Token<'a> {
     Assign,
     TimeAt,
     Newline,
-    LineComment(String),
+}
+
+pub fn token_type_eq<'a>(t1: &Token<'a>, t2: &Token<'a>) -> bool {
+    match t1 {
+        Token::Float(_) => match t2 {
+            Token::Float(_) => true,
+            _ => false,
+        },
+        Token::Keyword(_) => match t2 {
+            Token::Keyword(_) => true,
+            _ => false,
+        },
+        Token::Special(_) => match t2 {
+            Token::Special(_) => true,
+            _ => false,
+        },
+        Token::Op(_) => match t2 {
+            Token::Op(_) => true,
+            _ => false,
+        },
+        Token::Identifier(_) => match t2 {
+            Token::Identifier(_) => true,
+            _ => false,
+        },
+        Token::String(_) => match t2 {
+            Token::String(_) => true,
+            _ => false,
+        },
+        Token::LineComment(_) => match t2 {
+            Token::LineComment(_) => true,
+            _ => false,
+        },
+        Token::Comma => match t2 {
+            Token::Comma => true,
+            _ => false,
+        },
+        Token::Colon => match t2 {
+            Token::Colon => true,
+            _ => false,
+        },
+        Token::OpenParen => match t2 {
+            Token::OpenParen => true,
+            _ => false,
+        },
+        Token::CloseParen => match t2 {
+            Token::CloseParen => true,
+            _ => false,
+        },
+        Token::OpenBracket => match t2 {
+            Token::OpenBracket => true,
+            _ => false,
+        },
+        Token::CloseBracket => match t2 {
+            Token::CloseBracket => true,
+            _ => false,
+        },
+        Token::OpenBrace => match t2 {
+            Token::OpenBrace => true,
+            _ => false,
+        },
+        Token::CloseBrace => match t2 {
+            Token::CloseBrace => true,
+            _ => false,
+        },
+        Token::FnReturnType => match t2 {
+            Token::FnReturnType => true,
+            _ => false,
+        },
+        Token::Assign => match t2 {
+            Token::Assign => true,
+            _ => false,
+        },
+        Token::TimeAt => match t2 {
+            Token::TimeAt => true,
+            _ => false,
+        },
+        Token::Newline => match t2 {
+            Token::Newline => true,
+            _ => false,
+        },
+    }
 }
 
 fn tokenize_int(s: &str) -> IResult<&str, f64> {
