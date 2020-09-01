@@ -1,8 +1,6 @@
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::{
-    char, digit1, multispace0, newline, none_of, one_of, space0, space1,
-};
+use nom::character::complete::{char, digit1, line_ending, none_of, one_of, space0, space1};
 use nom::combinator::{all_consuming, opt};
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
@@ -195,7 +193,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
     let mut input = s;
 
     loop {
-        let (s, _) = opt(multispace0::<&str, (&str, ErrorKind)>)(input)?;
+        let (s, _) = opt(space0::<&str, (&str, ErrorKind)>)(input)?;
         input = s;
 
         if s == "" {
