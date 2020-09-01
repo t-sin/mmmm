@@ -728,4 +728,52 @@ mod test_parse {
             "f1(1+2, 3*4)",
         );
     }
+
+    fn test_parse_all(expected: &[AST], string: &str) {
+        println!("text: {:?}", string);
+        if let Ok(("", tokens)) = tokenize(string) {
+            println!("tokens: {:?}", tokens);
+            match parse(&tokens) {
+                Ok((&[], vec)) => {
+                    assert_eq!(vec.len(), expected.len());
+                    for (i, ast) in vec.iter().enumerate() {
+                        assert_eq!(*ast, expected[i]);
+                    }
+                }
+                err => {
+                    println!("{:?}", err);
+                    assert!(false);
+                }
+            }
+        } else {
+            println!("This test case itself is wrong....");
+            assert!(false);
+        }
+    }
+
+    #[test]
+    fn test_assignment() {
+        test_parse_all(
+            &[AST::Assign(
+                Box::new(Symbol("var".to_string())),
+                Box::new(Exp::Float(123.0)),
+            )],
+            "var = 123",
+        );
+
+        test_parse_all(
+            &[
+                AST::Assign(
+                    Box::new(Symbol("var".to_string())),
+                    Box::new(Exp::Float(123.0)),
+                ),
+                AST::Assign(
+                    Box::new(Symbol("var2".to_string())),
+                    Box::new(Exp::Float(456.0)),
+                ),
+            ],
+            "var = 123
+             var2 = 456",
+        );
+    }
 }
