@@ -1,4 +1,5 @@
 use crate::tokenize::{token_type_eq, Token};
+use nom::branch::{alt, permutation};
 use nom::combinator::rest_len;
 use nom::error::ErrorKind;
 use nom::{Err, IResult};
@@ -42,6 +43,7 @@ pub enum Exp {
 /// Note: Now can parse only expressions.
 pub enum AST {
     Exp(Box<Exp>),
+    Assign(Box<Symbol>, Box<Exp>),
 }
 
 /// Represents mmmm's operator associativity.
@@ -397,8 +399,29 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     }
 }
 
+fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+    match permutation((
+        token_type_of(Token::Identifier("".to_string())),
+        token_type_of(Token::Assign),
+        parse_expression,
+    ))(t)
+    {
+        Ok((rest, (Token::Identifier(name), _, ref ast))) => {
+            if let Some(AST::Exp(exp)) = ast {
+                let ast = AST::Assign(Box::new(Symbol(name.to_string())), (*exp).clone());
+                Ok((rest, Some(ast)))
+            } else {
+                Err(Err::Error((rest, ErrorKind::IsNot)))
+            }
+        }
+        Ok((rest, (_, _, _))) => Err(Err::Error((rest, ErrorKind::IsNot))),
+        Err(err) => Err(err),
+    }
+}
+
 fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
-    parse_expression(t)
+    let (t, ast) = alt((parse_assignment, parse_expression))(t)?;
+    Ok((t, ast))
 }
 
 pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
