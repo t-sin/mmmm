@@ -4,6 +4,9 @@ use nom::combinator::rest_len;
 use nom::error::ErrorKind;
 use nom::{Err, IResult};
 
+/// Recognize one token by checking token type.
+///
+/// It means this combinator ignores enum variants' inner values.
 fn token_type_of<'a>(
     token: Token<'a>,
 ) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
