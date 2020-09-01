@@ -311,6 +311,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         | Some(Token::Assign)
         | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Comma) => Ok(()),
+        Some(Token::Colon) => Err(Err::Error((&state.input[1..], ErrorKind::IsNot))),
         Some(Token::Newline) | Some(Token::CloseParen) | None => terminate_parse_exp_1(state),
     };
 

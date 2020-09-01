@@ -18,6 +18,7 @@ pub enum Token<'a> {
     Identifier(String),
     String(String),
     Comma,
+    Colon,
     OpenParen,
     CloseParen,
     OpenBracket,
@@ -110,9 +111,13 @@ fn tokenize_op(s: &str) -> IResult<&str, Token> {
     Ok((s, Token::Op(op)))
 }
 
-fn tokenize_comma(s: &str) -> IResult<&str, Token> {
-    let (s, _) = char(',')(s)?;
-    Ok((s, Token::Comma))
+fn tokenize_delimiter(s: &str) -> IResult<&str, Token> {
+    match one_of::<&str, &str, (&str, ErrorKind)>(":,")(s) {
+        Ok((s, ',')) => Ok((s, Token::Comma)),
+        Ok((s, ':')) => Ok((s, Token::Colon)),
+        Ok((s, _)) => Err(Err::Error((s, ErrorKind::OneOf))),
+        Err(err) => Err(err),
+    }
 }
 
 fn tokenize_assignment(s: &str) -> IResult<&str, Token> {
@@ -204,7 +209,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
             tokenize_op,
             tokenize_special_variable,
             tokenize_keyword,
-            tokenize_comma,
+            tokenize_delimiter,
             tokenize_parens,
             tokenize_string,
             tokenize_assignment,
