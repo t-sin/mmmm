@@ -378,7 +378,6 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
     }
 
     let result = match token {
-        Some(Token::CloseBrace) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Float(f)) => {
             state.output.push(Exp::Float(*f));
             Ok(())
@@ -414,9 +413,11 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Comma) => Ok(()),
         Some(Token::Colon) => Err(Err::Error((&state.input[1..], ErrorKind::IsNot))),
-        Some(Token::Newline) | Some(Token::CloseParen) | Some(Token::CloseBracket) | None => {
-            terminate_parse_exp_1(state)
-        }
+        Some(Token::Newline)
+        | Some(Token::CloseParen)
+        | Some(Token::CloseBracket)
+        | Some(Token::CloseBrace)
+        | None => terminate_parse_exp_1(state),
     };
 
     state.prev_token = if let Some(token) = token {
