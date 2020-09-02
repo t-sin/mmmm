@@ -708,6 +708,44 @@ mod test_parse {
     }
 
     #[test]
+    fn test_array_access() {
+        test_parse_1(
+            AST::Exp(Box::new(Exp::PostOp(
+                "[]".to_string(),
+                Box::new(Symbol("a".to_string())),
+                Box::new(Exp::Float(1.0)),
+            ))),
+            "a[1]",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::PostOp(
+                "[]".to_string(),
+                Box::new(Symbol("a".to_string())),
+                Box::new(Exp::Variable(Box::new(Symbol("var".to_string())))),
+            ))),
+            "a[var]",
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::PostOp(
+                "[]".to_string(),
+                Box::new(Symbol("a".to_string())),
+                Box::new(Exp::BinaryOp(
+                    "%".to_string(),
+                    Box::new(Exp::Variable(Box::new(Symbol("var".to_string())))),
+                    Box::new(Exp::BinaryOp(
+                        "-".to_string(),
+                        Box::new(Exp::Float(10.0)),
+                        Box::new(Exp::Float(2.0)),
+                    )),
+                )),
+            ))),
+            "a[var%(10-2)]",
+        );
+    }
+
+    #[test]
     fn test_function_call() {
         test_parse_1(
             AST::Exp(Box::new(Exp::InvokeFn(
@@ -873,6 +911,21 @@ mod test_parse {
             ],
             "var = 123
              var2 = 4+5*6",
+        );
+
+        test_parse_all(
+            &[AST::Assign(
+                Box::new(Symbol("var".to_string())),
+                Box::new(Exp::InvokeFn(
+                    Box::new(Symbol("f".to_string())),
+                    vec![Exp::BinaryOp(
+                        "+".to_string(),
+                        Box::new(Exp::Float(1.0)),
+                        Box::new(Exp::Float(2.0)),
+                    )],
+                )),
+            )],
+            "var = f(1+2)",
         );
     }
 }
