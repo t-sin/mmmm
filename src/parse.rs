@@ -528,45 +528,45 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
         // parse function body
         delimited(
             token(Token::OpenBrace),
-            parse_expression,
+            separated_list(
+                token(Token::Newline),
+                alt((parse_assignment, parse_expression)),
+            ),
             token(Token::CloseBrace),
         ),
     ))(t)
     {
-        Ok((rest, (_, fn_name, args, fn_type, expvec))) => Ok((
-            rest,
-            Some(AST::Defun(
-                // function name
-                if let Token::Identifier(name) = fn_name {
-                    Box::new(Symbol(name.to_string()))
-                } else {
-                    return Err(Err::Error((rest, ErrorKind::IsNot)));
-                },
-                // function args
-                args.into_iter()
-                    .map(|t| {
-                        if let Token::Identifier(name) = t {
-                            Symbol(name.to_string())
-                        } else {
-                            panic!("unreached here because of matching Token::Identifier")
-                        }
-                    })
-                    .collect(),
-                // function return type
-                if let Some((_, Token::Keyword(type_name))) = fn_type {
-                    Some(Symbol(type_name.to_string()))
-                } else {
-                    None
-                },
-                // function body
-                vec![expvec.unwrap()],
-                // expvec
-                //     .into_iter()
-                //     .filter(|o| if let None = o { false } else { true })
-                //     .map(|o| o.unwrap())
-                //     .collect(),
-            )),
-        )),
+        Ok((rest, (_, fn_name, args, fn_type, expvec))) => {
+            Ok((
+                rest,
+                Some(AST::Defun(
+                    // function name
+                    if let Token::Identifier(name) = fn_name {
+                        Box::new(Symbol(name.to_string()))
+                    } else {
+                        return Err(Err::Error((rest, ErrorKind::IsNot)));
+                    },
+                    // function args
+                    args.into_iter()
+                        .map(|t| {
+                            if let Token::Identifier(name) = t {
+                                Symbol(name.to_string())
+                            } else {
+                                panic!("unreached here because of matching Token::Identifier")
+                            }
+                        })
+                        .collect(),
+                    // function return type
+                    if let Some((_, Token::Keyword(type_name))) = fn_type {
+                        Some(Symbol(type_name.to_string()))
+                    } else {
+                        None
+                    },
+                    // function body
+                    expvec.into_iter().map(|o| o.unwrap()).collect(),
+                )),
+            ))
+        }
         Err(err) => Err(err),
     }
 }
