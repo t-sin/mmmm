@@ -575,6 +575,19 @@ mod test_parse {
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
                 "+".to_string(),
+                Box::new(Exp::Float(1.0)),
+                Box::new(Exp::BinaryOp(
+                    "*".to_string(),
+                    Box::new(Exp::Float(2.0)),
+                    Box::new(Exp::Float(3.0)),
+                )),
+            ))),
+            "1+2*3", // 1+(2*3)
+        );
+
+        test_parse_1(
+            AST::Exp(Box::new(Exp::BinaryOp(
+                "+".to_string(),
                 Box::new(Exp::BinaryOp(
                     "-".to_string(),
                     Box::new(Exp::BinaryOp(
@@ -784,6 +797,29 @@ mod test_parse {
             ],
             "var = 123
              var2 = 456",
+        );
+
+        test_parse_all(
+            &[
+                AST::Assign(
+                    Box::new(Symbol("var".to_string())),
+                    Box::new(Exp::Float(123.0)),
+                ),
+                AST::Assign(
+                    Box::new(Symbol("var2".to_string())),
+                    Box::new(Exp::BinaryOp(
+                        "+".to_string(),
+                        Box::new(Exp::Float(4.0)),
+                        Box::new(Exp::BinaryOp(
+                            "*".to_string(),
+                            Box::new(Exp::Float(5.0)),
+                            Box::new(Exp::Float(6.0)),
+                        )),
+                    )),
+                ),
+            ],
+            "var = 123
+             var2 = 4+5*6",
         );
     }
 }
