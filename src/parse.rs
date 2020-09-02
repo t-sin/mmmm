@@ -260,15 +260,23 @@ fn parse_exp_1_op<'a>(
     } else {
         loop {
             if let Some(Token::Op(op2)) = state.stack.last() {
-                if let OperatorAssociativity::Left = operator_associativity(op1) {
-                    if operator_precedence(op1) > operator_precedence(op2) {
-                        break;
+                // if op2 has high precedence (lesser number) than op1, immediately pop op2 and construct Exp::BinaryOp
+                // so op1 has lesser precedence number (it means low precedence), immediately breaks this loop
+                match operator_associativity(op1) {
+                    OperatorAssociativity::Left => {
+                        if operator_precedence(op1) < operator_precedence(op2) {
+                            break;
+                        }
                     }
-                } else {
-                    if operator_precedence(op1) >= operator_precedence(op2) {
-                        break;
+                    OperatorAssociativity::Right => {
+                        if operator_precedence(op1) <= operator_precedence(op2) {
+                            break;
+                        }
                     }
-                }
+                    OperatorAssociativity::None => {
+                        panic!("oh {:?} is not an operator. it may be a bug!", op1);
+                    }
+                };
 
                 if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
                     (state.stack.pop(), state.output.pop(), state.output.pop())
