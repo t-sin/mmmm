@@ -1,7 +1,9 @@
 use crate::tokenize::{token_type_eq, Token};
 use nom::branch::{alt, permutation};
-use nom::combinator::rest_len;
+use nom::combinator::{opt, rest_len};
 use nom::error::ErrorKind;
+use nom::multi::separated_list;
+use nom::sequence::delimited;
 use nom::{Err, IResult};
 
 /// Recognize one token.
@@ -63,6 +65,7 @@ pub enum Exp {
 pub enum AST {
     Exp(Box<Exp>),
     Assign(Box<Symbol>, Box<Exp>),
+    Defun(Box<Symbol>, Vec<Symbol>, Option<Symbol>, Vec<AST>),
 }
 
 /// Represents mmmm's operator associativity.
@@ -501,8 +504,78 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     }
 }
 
+//fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {}
+
+fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+    match permutation((
+        token(Token::Keyword("fn")),
+        token_type_of(Token::Identifier("".to_string())),
+        // parse function args
+        delimited(
+            token(Token::OpenParen),
+            separated_list(
+                token(Token::Comma),
+                token_type_of(Token::Identifier("".to_string())),
+            ),
+            token(Token::CloseParen),
+        ),
+        // parse function return type
+        opt(permutation((
+            token(Token::FnReturnType),
+            token_type_of(Token::Keyword("")),
+        ))),
+        // parse function body
+        delimited(
+            token(Token::OpenBrace),
+            parse_expression,
+            token(Token::CloseBrace),
+        ),
+    ))(t)
+    {
+        Ok((rest, (_, fn_name, args, fn_type, expvec))) => Ok((
+            rest,
+            Some(AST::Defun(
+                // function name
+                if let Token::Identifier(name) = fn_name {
+                    Box::new(Symbol(name.to_string()))
+                } else {
+                    return Err(Err::Error((rest, ErrorKind::IsNot)));
+                },
+                // function args
+                args.into_iter()
+                    .map(|t| {
+                        if let Token::Identifier(name) = t {
+                            Symbol(name.to_string())
+                        } else {
+                            panic!("unreached here because of matching Token::Identifier")
+                        }
+                    })
+                    .collect(),
+                // function return type
+                if let Some((_, Token::Keyword(type_name))) = fn_type {
+                    Some(Symbol(type_name.to_string()))
+                } else {
+                    None
+                },
+                // function body
+                vec![expvec.unwrap()],
+                // expvec
+                //     .into_iter()
+                //     .filter(|o| if let None = o { false } else { true })
+                //     .map(|o| o.unwrap())
+                //     .collect(),
+            )),
+        )),
+        Err(err) => Err(err),
+    }
+}
+
 fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
-    let (t, ast) = alt((parse_assignment, parse_expression))(t)?;
+    let (t, ast) = alt((
+        parse_function_definition,
+        parse_assignment,
+        parse_expression,
+    ))(t)?;
     Ok((t, ast))
 }
 
