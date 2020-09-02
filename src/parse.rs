@@ -162,17 +162,19 @@ fn parse_funcall_args<'a>(
 fn terminate_parse_exp_1<'a>(
     state: &mut ParseExpState<'a>,
 ) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
-    match state.stack.pop() {
-        Some(Token::Op(op)) => {
-            if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
-                let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
-                state.output.push(exp);
-            } else {
-                return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+    loop {
+        match state.stack.pop() {
+            Some(Token::Op(op)) => {
+                if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
+                    let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
+                    state.output.push(exp);
+                } else {
+                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                }
             }
+            None => break,
+            _ => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         }
-        None => (),
-        _ => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
     }
 
     Ok(())
