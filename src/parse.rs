@@ -58,7 +58,7 @@ pub enum Exp {
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's abstruct syntax tree.
 ///
 /// Note: Now can parse only expressions.
