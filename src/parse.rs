@@ -180,23 +180,74 @@ fn terminate_parse_exp_1<'a>(
     Ok(())
 }
 
+fn parse_array_access<'a>(
+    state: &mut ParseExpState<'a>,
+) -> Result<Exp, Err<(&'a [Token<'a>], ErrorKind)>> {
+    state.input = &state.input[1..];
+    state.prev_token = Some(Token::OpenBracket);
+
+    let mut array_access_state = ParseExpState {
+        nest: state.nest + 1,
+        input: state.input,
+        output: Vec::new(),
+        stack: Vec::new(),
+        prev_token: None,
+    };
+
+    if let Err(err) = parse_exp(&mut array_access_state) {
+        return Err(err);
+    }
+
+    if let Some(Token::CloseBracket) = array_access_state.input.iter().nth(0) {
+        state.input = &array_access_state.input[1..];
+        state.prev_token = Some(Token::CloseBracket);
+        if let Some(exp) = array_access_state.output.pop() {
+            Ok(exp)
+        } else {
+            Err(Err::Error((
+                &array_access_state.input[..],
+                ErrorKind::IsNot,
+            )))
+        }
+    } else {
+        Err(Err::Error((
+            &array_access_state.input[..],
+            ErrorKind::IsNot,
+        )))
+    }
+}
+
 fn parse_exp_1_identifier<'a>(
     name: &String,
     state: &mut ParseExpState<'a>,
 ) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
-    if let Some(Token::OpenParen) = state.input.iter().nth(0) {
-        // function invokation
-        let args = match parse_funcall_args(state) {
-            Ok(args) => args,
+    match state.input.iter().nth(0) {
+        Some(Token::OpenParen) => {
+            // function invokation
+            let args = match parse_funcall_args(state) {
+                Ok(args) => args,
+                Err(err) => return Err(err),
+            };
+            let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
+            state.output.push(exp);
+        }
+        Some(Token::OpenBracket) => match parse_array_access(state) {
+            Ok(exp) => {
+                let exp = Exp::PostOp(
+                    "[]".to_string(),
+                    Box::new(Symbol(name.to_string())),
+                    Box::new(exp),
+                );
+                state.output.push(exp);
+            }
             Err(err) => return Err(err),
-        };
-        let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
-        state.output.push(exp);
-    } else {
-        // variable
-        let exp = Exp::Variable(Box::new(Symbol(name.to_string())));
-        state.output.push(exp);
-    }
+        },
+        _ => {
+            // variable
+            let exp = Exp::Variable(Box::new(Symbol(name.to_string())));
+            state.output.push(exp);
+        }
+    };
 
     Ok(())
 }
@@ -339,13 +390,14 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         }
         Some(Token::OpenBrace)
         | Some(Token::OpenBracket)
-        | Some(Token::CloseBracket)
         | Some(Token::FnReturnType)
         | Some(Token::Assign)
         | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
         Some(Token::Comma) => Ok(()),
         Some(Token::Colon) => Err(Err::Error((&state.input[1..], ErrorKind::IsNot))),
-        Some(Token::Newline) | Some(Token::CloseParen) | None => terminate_parse_exp_1(state),
+        Some(Token::Newline) | Some(Token::CloseParen) | Some(Token::CloseBracket) | None => {
+            terminate_parse_exp_1(state)
+        }
     };
 
     state.prev_token = if let Some(token) = token {
@@ -367,6 +419,7 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
         Token::Comma => true,
         Token::Newline => true,
         Token::CloseParen => true,
+        Token::CloseBracket => true,
         Token::OpenBrace | Token::CloseBrace => true,
         _ => false,
     }
