@@ -546,7 +546,14 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
             token(Token::OpenParen),
             separated_list(
                 token(Token::Comma),
-                token_type_of(Token::Identifier("".to_string())),
+                permutation((
+                    token_type_of(Token::Identifier("".to_string())),
+                    // function return type
+                    opt(permutation((
+                        token(Token::FnReturnType),
+                        token_type_of(Token::Identifier("".to_string())),
+                    ))),
+                )),
             ),
             token(Token::CloseParen),
         ),
@@ -570,12 +577,17 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
                     },
                     // function args
                     args.into_iter()
-                        .map(|t| {
-                            if let Token::Identifier(name) = t {
-                                Symbol(name.to_string())
-                            } else {
-                                panic!("unreached here because of matching Token::Identifier")
+                        .map(|t| match t {
+                            (Token::Identifier(name), Some((_, Token::Identifier(type_name)))) => {
+                                Declare::Var(
+                                    Box::new(Symbol(name.to_string())),
+                                    Some(Symbol(type_name.to_string())),
+                                )
                             }
+                            (Token::Identifier(name), None) => {
+                                Declare::Var(Box::new(Symbol(name.to_string())), None)
+                            }
+                            _ => panic!("unreached here because of matching Token::Identifier"),
                         })
                         .collect(),
                     // function return type
