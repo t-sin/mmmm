@@ -518,8 +518,12 @@ fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<A
         Ok((rest, ast_vec)) => Ok((rest, ast_vec.into_iter().map(|o| o.unwrap()).collect())),
         Err(Err::Error((rest, err))) => {
             println!("{:?}, {:?}, {:?}", t, rest, err);
-            if let Token::CloseBrace = rest[0] {
-                Ok((&rest[1..], Vec::new()))
+            if rest.len() > 0 {
+                if let Token::CloseBrace = rest[0] {
+                    Ok((&rest[1..], Vec::new()))
+                } else {
+                    Err(Err::Error((rest, err)))
+                }
             } else {
                 Err(Err::Error((rest, err)))
             }
