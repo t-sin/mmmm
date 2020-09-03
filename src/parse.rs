@@ -1222,4 +1222,30 @@ mod test_parse {
             "fn f1() {return 10+f(20-1)}",
         );
     }
+
+    #[test]
+    fn test_function_return_type() {
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("loop".to_string())),
+                vec![],
+                Some(Symbol("void".to_string())),
+                vec![],
+            )],
+            "fn loop()->void {}",
+        );
+    }
+
+    #[test]
+    fn test_newlines() {
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("loop".to_string())),
+                vec![],
+                Some(Symbol("void".to_string())),
+                vec![],
+            )],
+            "fn loop()\n->void {}",
+        );
+    }
 }
