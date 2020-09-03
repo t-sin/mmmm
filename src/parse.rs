@@ -1134,5 +1134,41 @@ mod test_parse {
             )],
             "fn func() {a=42\nb=84}",
         );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![Declare::Var(Box::new(Symbol("a".to_string())), None)],
+                None,
+                vec![],
+            )],
+            "fn func(a) {}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![
+                    Declare::Var(Box::new(Symbol("a".to_string())), None),
+                    Declare::Var(Box::new(Symbol("b".to_string())), None),
+                ],
+                None,
+                vec![],
+            )],
+            "fn func(a, b) {}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![Declare::Var(
+                    Box::new(Symbol("a".to_string())),
+                    Some(Symbol("float".to_string())),
+                )],
+                None,
+                vec![],
+            )],
+            "fn func(a: float) {}",
+        );
     }
 }
