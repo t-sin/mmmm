@@ -2,7 +2,7 @@ use crate::tokenize::{token_type_eq, Token};
 use nom::branch::{alt, permutation};
 use nom::combinator::{opt, rest_len};
 use nom::error::ErrorKind;
-use nom::multi::separated_list;
+use nom::multi::{many0, separated_list};
 use nom::sequence::delimited;
 use nom::{Err, IResult};
 
@@ -507,6 +507,30 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
 
 //fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {}
 
+fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<AST>> {
+    // parse function body
+    match delimited(
+        token(Token::OpenBrace),
+        many0(alt((parse_assignment, parse_expression))),
+        token(Token::CloseBrace),
+    )(t)
+    {
+        Ok((rest, ast_vec)) => Ok((rest, ast_vec.into_iter().map(|o| o.unwrap()).collect())),
+        Err(Err::Error((rest, err))) => {
+            println!("{:?}, {:?}, {:?}", t, rest, err);
+            if let Token::CloseBrace = rest[0] {
+                Ok((&rest[1..], Vec::new()))
+            } else {
+                Err(Err::Error((rest, err)))
+            }
+        }
+        Err(err) => {
+            println!("{:?}", err);
+            Err(err)
+        }
+    }
+}
+
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
     match permutation((
         token(Token::Keyword("fn")),
@@ -525,18 +549,10 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
             token(Token::FnReturnType),
             token_type_of(Token::Keyword("")),
         ))),
-        // parse function body
-        delimited(
-            token(Token::OpenBrace),
-            separated_list(
-                token(Token::Newline),
-                alt((parse_assignment, parse_expression)),
-            ),
-            token(Token::CloseBrace),
-        ),
+        parse_function_body,
     ))(t)
     {
-        Ok((rest, (_, fn_name, args, fn_type, expvec))) => {
+        Ok((rest, (_, fn_name, args, fn_type, ast_vec))) => {
             Ok((
                 rest,
                 Some(AST::Defun(
@@ -563,7 +579,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
                         None
                     },
                     // function body
-                    expvec.into_iter().map(|o| o.unwrap()).collect(),
+                    ast_vec,
                 )),
             ))
         }
