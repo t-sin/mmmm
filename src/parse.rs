@@ -59,13 +59,19 @@ pub enum Exp {
 }
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Declare {
+    Var(Box<Symbol>, Option<Symbol>),
+}
+
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's abstruct syntax tree.
 ///
 /// Note: Now can parse only expressions.
 pub enum AST {
     Exp(Box<Exp>),
     Assign(Box<Symbol>, Box<Exp>),
-    Defun(Box<Symbol>, Vec<Symbol>, Option<Symbol>, Vec<AST>),
+    Return(Box<Exp>),
+    Defun(Box<Symbol>, Vec<Declare>, Option<Symbol>, Vec<AST>),
 }
 
 /// Represents mmmm's operator associativity.
