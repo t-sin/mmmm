@@ -1064,4 +1064,49 @@ mod test_parse {
             "var = f(1+2)",
         );
     }
+
+    #[test]
+    fn test_function_definition() {
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![],
+                None,
+                vec![],
+            )],
+            "fn func() {}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![],
+                None,
+                vec![AST::Assign(
+                    Box::new(Symbol("a".to_string())),
+                    Box::new(Exp::Float(42.0)),
+                )],
+            )],
+            "fn func() {a=42}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![],
+                None,
+                vec![
+                    AST::Assign(
+                        Box::new(Symbol("a".to_string())),
+                        Box::new(Exp::Float(42.0)),
+                    ),
+                    AST::Assign(
+                        Box::new(Symbol("b".to_string())),
+                        Box::new(Exp::Float(84.0)),
+                    ),
+                ],
+            )],
+            "fn func() {a=42\nb=84}",
+        );
+    }
 }
