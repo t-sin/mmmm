@@ -933,6 +933,25 @@ mod test_parse {
         );
     }
 
+    #[test]
+    fn test_empty_string() {
+        if let Ok(("", tokens)) = tokenize("") {
+            println!("tokens: {:?}", tokens);
+            match parse(&tokens) {
+                Ok((&[], vec)) => {
+                    assert_eq!(vec.len(), 0);
+                }
+                Ok((_, _)) => assert!(false),
+                Err(err) => {
+                    println!("err = {:?}", err);
+                    assert!(false)
+                }
+            }
+        } else {
+            assert!(false)
+        }
+    }
+
     fn test_parse_all(expected: &[AST], string: &str) {
         println!("text: {:?}", string);
         if let Ok(("", tokens)) = tokenize(string) {
