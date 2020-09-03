@@ -511,6 +511,17 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     }
 }
 
+fn parse_return<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+    match permutation((token(Token::Keyword("return")), parse_expression))(t) {
+        Ok((rest, (_, Some(AST::Exp(exp))))) => {
+            Ok((rest, Some(AST::Return(Box::new(*exp.clone())))))
+        }
+        Ok((rest, (_, Some(_)))) => Err(Err::Error((rest, ErrorKind::IsNot))),
+        Ok((rest, (_, None))) => Err(Err::Error((rest, ErrorKind::IsNot))),
+        Err(err) => Err(err),
+    }
+}
+
 fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<Declare>> {
     match delimited(
         token(Token::OpenParen),
@@ -555,6 +566,7 @@ fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<A
         token(Token::OpenBrace),
         opt(many0(alt((
             parse_assignment,
+            parse_return,
             value(None, token(Token::Newline)),
         )))),
         token(Token::CloseBrace),
