@@ -457,9 +457,9 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
         return Err(err);
     }
 
-    if let Some(Token::Newline) = state.input.iter().nth(0) {
-        state.input = &state.input[1..];
-    }
+    // if let Some(Token::Newline) = state.input.iter().nth(0) {
+    //     state.input = &state.input[1..];
+    // }
 
     Ok(())
 }
