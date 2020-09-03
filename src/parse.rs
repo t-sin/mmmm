@@ -587,18 +587,23 @@ fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<A
 
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
     match permutation((
+        opt(many0(token(Token::Newline))),
         token(Token::Keyword("fn")),
+        many0(token(Token::Newline)),
         token_type_of(Token::Identifier("".to_string())),
+        many0(token(Token::Newline)),
         parse_function_args,
         // parse function return type
         opt(permutation((
             token(Token::FnReturnType),
             token_type_of(Token::Keyword("")),
         ))),
+        many0(token(Token::Newline)),
         parse_function_body,
+        opt(many0(token(Token::Newline))),
     ))(t)
     {
-        Ok((rest, (_, fn_name, args, fn_type, ast_vec))) => {
+        Ok((rest, (_, _, _, fn_name, _, args, fn_type, _, ast_vec, _))) => {
             Ok((
                 rest,
                 Some(AST::Defun(
