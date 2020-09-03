@@ -1183,4 +1183,38 @@ mod test_parse {
             "fn func(a: float) {}",
         );
     }
+
+    #[test]
+    fn test_return() {
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![],
+                None,
+                vec![AST::Return(Box::new(Exp::Float(0.0)))],
+            )],
+            "fn func() {return 0}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("f1".to_string())),
+                vec![],
+                None,
+                vec![AST::Return(Box::new(Exp::BinaryOp(
+                    "+".to_string(),
+                    Box::new(Exp::Float(10.0)),
+                    Box::new(Exp::InvokeFn(
+                        Box::new(Symbol("f".to_string())),
+                        vec![Exp::BinaryOp(
+                            "-".to_string(),
+                            Box::new(Exp::Float(20.0)),
+                            Box::new(Exp::Float(1.0)),
+                        )],
+                    )),
+                )))],
+            )],
+            "fn f1() {return 10+f(20-1)}",
+        );
+    }
 }
