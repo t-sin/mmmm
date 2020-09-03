@@ -511,7 +511,43 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     }
 }
 
-//fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {}
+fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<Declare>> {
+    match delimited(
+        token(Token::OpenParen),
+        separated_list(
+            token(Token::Comma),
+            permutation((
+                token_type_of(Token::Identifier("".to_string())),
+                // function return type
+                opt(permutation((
+                    token(Token::Colon),
+                    token_type_of(Token::Identifier("".to_string())),
+                ))),
+            )),
+        ),
+        token(Token::CloseParen),
+    )(t)
+    {
+        Ok((rest, args)) => Ok((
+            rest,
+            args.into_iter()
+                .map(|t| match t {
+                    (Token::Identifier(name), Some((_, Token::Identifier(type_name)))) => {
+                        Declare::Var(
+                            Box::new(Symbol(name.to_string())),
+                            Some(Symbol(type_name.to_string())),
+                        )
+                    }
+                    (Token::Identifier(name), None) => {
+                        Declare::Var(Box::new(Symbol(name.to_string())), None)
+                    }
+                    _ => panic!("unreached here because of matching Token::Identifier"),
+                })
+                .collect(),
+        )),
+        Err(err) => Err(err),
+    }
+}
 
 fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<AST>> {
     // parse function body
@@ -541,22 +577,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
     match permutation((
         token(Token::Keyword("fn")),
         token_type_of(Token::Identifier("".to_string())),
-        // parse function args
-        delimited(
-            token(Token::OpenParen),
-            separated_list(
-                token(Token::Comma),
-                permutation((
-                    token_type_of(Token::Identifier("".to_string())),
-                    // function return type
-                    opt(permutation((
-                        token(Token::FnReturnType),
-                        token_type_of(Token::Identifier("".to_string())),
-                    ))),
-                )),
-            ),
-            token(Token::CloseParen),
-        ),
+        parse_function_args,
         // parse function return type
         opt(permutation((
             token(Token::FnReturnType),
@@ -576,20 +597,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
                         return Err(Err::Error((rest, ErrorKind::IsNot)));
                     },
                     // function args
-                    args.into_iter()
-                        .map(|t| match t {
-                            (Token::Identifier(name), Some((_, Token::Identifier(type_name)))) => {
-                                Declare::Var(
-                                    Box::new(Symbol(name.to_string())),
-                                    Some(Symbol(type_name.to_string())),
-                                )
-                            }
-                            (Token::Identifier(name), None) => {
-                                Declare::Var(Box::new(Symbol(name.to_string())), None)
-                            }
-                            _ => panic!("unreached here because of matching Token::Identifier"),
-                        })
-                        .collect(),
+                    args,
                     // function return type
                     if let Some((_, Token::Keyword(type_name))) = fn_type {
                         Some(Symbol(type_name.to_string()))
