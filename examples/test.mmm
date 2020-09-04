@@ -1,0 +1,12 @@
+wavpath = "./ev.wav"
+wav = loadwav(wavpath)
+wavlen = loadwavsize(wavpath)
+pos = 0
+
+fn dsp()->void {
+  v = wav[pos]
+  pos = (pos + 1) % wavlen
+  return v
+}
+
+test=1
