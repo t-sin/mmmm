@@ -10,7 +10,7 @@ use nom::{Err, IResult};
 fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
     move |t| {
         let (t, len) = rest_len(t)?;
-        if len != 0 {
+        if len > 0 {
             if &t[0] == &token {
                 Ok((&t[1..], &t[0]))
             } else {
@@ -30,7 +30,7 @@ fn token_type_of<'a>(
 ) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
     move |t| {
         let (t, len) = rest_len(t)?;
-        if len != 0 {
+        if len > 0 {
             if token_type_eq(&t[0], &token) {
                 Ok((&t[1..], &t[0]))
             } else {
