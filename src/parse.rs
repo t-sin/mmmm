@@ -151,43 +151,6 @@ fn terminate_parse_exp_1<'a>(
     Ok(())
 }
 
-fn parse_array_access<'a>(
-    state: &mut ParseExpState<'a>,
-) -> Result<Exp, Err<(&'a [Token<'a>], ErrorKind)>> {
-    state.input = &state.input[1..];
-    state.prev_token = Some(Token::OpenBracket);
-
-    let mut array_access_state = ParseExpState {
-        nest: state.nest + 1,
-        input: state.input,
-        output: Vec::new(),
-        stack: Vec::new(),
-        prev_token: None,
-    };
-
-    if let Err(err) = parse_exp(&mut array_access_state) {
-        return Err(err);
-    }
-
-    if let Some(Token::CloseBracket) = array_access_state.input.iter().nth(0) {
-        state.input = &array_access_state.input[1..];
-        state.prev_token = Some(Token::CloseBracket);
-        if let Some(exp) = array_access_state.output.pop() {
-            Ok(exp)
-        } else {
-            Err(Err::Error((
-                &array_access_state.input[..],
-                ErrorKind::IsNot,
-            )))
-        }
-    } else {
-        Err(Err::Error((
-            &array_access_state.input[..],
-            ErrorKind::IsNot,
-        )))
-    }
-}
-
 fn parse_exp_1_identifier<'a>(
     name: &String,
     state: &mut ParseExpState<'a>,
@@ -210,17 +173,27 @@ fn parse_exp_1_identifier<'a>(
                 Err(err) => return Err(err),
             };
         }
-        Some(Token::OpenBracket) => match parse_array_access(state) {
-            Ok(exp) => {
-                let exp = Exp::PostOp(
-                    "[]".to_string(),
-                    Box::new(Symbol(name.to_string())),
-                    Box::new(exp),
-                );
-                state.output.push(exp);
+        Some(Token::OpenBracket) => {
+            // array access
+            match delimited(
+                token(Token::OpenBracket),
+                parse_expression,
+                token(Token::CloseBracket),
+            )(state.input)
+            {
+                Ok((rest, exp)) => {
+                    state.input = rest;
+                    state.prev_token = Some(Token::CloseBracket);
+                    let exp = Exp::PostOp(
+                        "[]".to_string(),
+                        Box::new(Symbol(name.to_string())),
+                        Box::new(exp),
+                    );
+                    state.output.push(exp);
+                }
+                Err(err) => return Err(err),
             }
-            Err(err) => return Err(err),
-        },
+        }
         _ => {
             // variable
             let exp = Exp::Variable(Box::new(Symbol(name.to_string())));
