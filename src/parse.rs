@@ -1,23 +1,56 @@
 use crate::tokenize::{token_type_eq, Token};
 use nom::branch::{alt, permutation};
 use nom::combinator::{opt, rest_len, value};
-use nom::error::ErrorKind;
+use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, separated_list};
 use nom::sequence::delimited;
 use nom::{Err, IResult};
 
+/// Represents errors while parsing.
+pub enum MmmmParseError<I> {
+    Nom((I, ErrorKind)),
+    ExpressionStackIsEmpty,
+    UnexpectedToken,
+    UnexpectedEof,
+    CannotParseExpression,
+}
+
+impl<'a, I> ParseError<I> for MmmmParseError<I> {
+    fn from_error_kind(input: I, kind: ErrorKind) -> Self {
+        MmmmParseError::Nom((input, kind))
+    }
+
+    fn append(_: I, _: ErrorKind, other: Self) -> Self {
+        other
+    }
+}
+
+type CombinatorResult<'a> =
+    IResult<&'a [Token<'a>], &'a Token<'a>, (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
+type ParseExp1Result<'a> =
+    IResult<&'a [Token<'a>], (), (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
+type ParseResult<'a> =
+    IResult<&'a [Token<'a>], Option<AST>, (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
+
+/// Represents mmmm's operator associativity.
+enum OperatorAssociativity {
+    Left,
+    Right,
+    None,
+}
+
 /// Recognize one token.
-fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
+fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'a> {
     move |t| {
         let (t, len) = rest_len(t)?;
         if len > 0 {
             if &t[0] == &token {
                 Ok((&t[1..], &t[0]))
             } else {
-                Err(Err::Error((&t[..], ErrorKind::IsNot)))
+                Err(Err::Error((&t[..], MmmmParseError::UnexpectedToken)))
             }
         } else {
-            Err(Err::Error((&t[..], ErrorKind::Eof)))
+            Err(Err::Error((&t[..], MmmmParseError::UnexpectedEof)))
         }
     }
 }
@@ -25,19 +58,17 @@ fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token
 /// Recognize one token by checking token type.
 ///
 /// It means this combinator ignores enum variants' union value.
-fn token_type_of<'a>(
-    token: Token<'a>,
-) -> impl Fn(&'a [Token<'a>]) -> IResult<&'a [Token<'a>], &'a Token> {
+fn token_type_of<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'a> {
     move |t| {
         let (t, len) = rest_len(t)?;
         if len > 0 {
             if token_type_eq(&t[0], &token) {
                 Ok((&t[1..], &t[0]))
             } else {
-                Err(Err::Error((&t[..], ErrorKind::IsNot)))
+                Err(Err::Error(MmmmParseError::UnexpectedToken))
             }
         } else {
-            Err(Err::Error((&t[..], ErrorKind::Eof)))
+            Err(Err::Error(MmmmParseError::UnexpectedEof))
         }
     }
 }
@@ -72,13 +103,6 @@ pub enum AST {
     Assign(Box<Symbol>, Box<Exp>),
     Return(Box<Exp>),
     Defun(Box<Symbol>, Vec<Declare>, Option<Symbol>, Vec<AST>),
-}
-
-/// Represents mmmm's operator associativity.
-enum OperatorAssociativity {
-    Left,
-    Right,
-    None,
 }
 
 /// Gives associativity to the specified operator name.
@@ -130,9 +154,7 @@ struct ParseExpState<'a> {
     prev_token: Option<Token<'a>>,
 }
 
-fn terminate_parse_exp_1<'a>(
-    state: &mut ParseExpState<'a>,
-) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     loop {
         match state.stack.pop() {
             Some(Token::Op(op)) => {
@@ -140,21 +162,26 @@ fn terminate_parse_exp_1<'a>(
                     let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
                     state.output.push(exp);
                 } else {
-                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                    return Err(Err::Error((
+                        &state.input[..],
+                        MmmmParseError::ExpressionStackIsEmpty,
+                    )));
                 }
             }
             None => break,
-            _ => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+            _ => {
+                return Err(Err::Error((
+                    &state.input[..],
+                    MmmmParseError::ExpressionStackIsEmpty,
+                )))
+            }
         }
     }
 
-    Ok(())
+    Ok((state.input, ()))
 }
 
-fn parse_exp_1_identifier<'a>(
-    name: &String,
-    state: &mut ParseExpState<'a>,
-) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     match state.input.iter().nth(0) {
         Some(Token::OpenParen) => {
             // function invokation
@@ -204,31 +231,24 @@ fn parse_exp_1_identifier<'a>(
     Ok(())
 }
 
-fn parse_exp_1_subexp<'a>(
-    state: &mut ParseExpState<'a>,
-) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+fn parse_exp_1_subexp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
+    println!("input = n{:?}", state);
     // precedes paren expression
-    let mut subexp_state = ParseExpState {
-        nest: state.nest + 1,
-        input: state.input,
-        output: Vec::new(),
-        stack: Vec::new(),
-        prev_token: None,
-    };
+    let res = delimited(
+        token(Token::OpenParen),
+        parse_expression,
+        token(Token::CloseParen),
+    )(state.input);
+    println!("res = {:?}", res);
 
-    if let Err(err) = parse_exp(&mut subexp_state) {
-        return Err(err);
-    }
-
-    if let Some(Token::CloseParen) = subexp_state.input.iter().nth(0) {
-        if let Some(exp) = subexp_state.output.pop() {
+    match res {
+        Ok((rest, exp)) => {
+            state.input = rest;
+            state.prev_token = Some(Token::CloseParen);
             state.output.push(exp);
+            Ok(())
         }
-        state.input = &subexp_state.input[1..];
-        state.prev_token = Some(Token::CloseParen);
-        Ok(())
-    } else {
-        Err(Err::Error((&subexp_state.input[..], ErrorKind::IsNot)))
+        Err(err) => Err(err),
     }
 }
 
@@ -250,7 +270,7 @@ fn parse_exp_1_op<'a>(
     op1: &str,
     token: Option<Token<'a>>,
     state: &mut ParseExpState<'a>,
-) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+) -> ParseExp1Result<'a> {
     if is_unary(op1, state.prev_token.clone()) {
         if let Err(err) = parse_exp_1(state) {
             return Err(err);
@@ -259,7 +279,10 @@ fn parse_exp_1_op<'a>(
                 let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
                 state.output.push(exp);
             } else {
-                return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                return Err(Err::Error((
+                    &state.input[..],
+                    MmmmParseError::ExpressionStackIsEmpty,
+                )));
             }
         }
     } else {
@@ -292,7 +315,10 @@ fn parse_exp_1_op<'a>(
                         Box::new(exp2),
                     ));
                 } else {
-                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
+                    return Err(Err::Error((
+                        &state.input[..],
+                        MmmmParseError::ExpressionStackIsEmpty,
+                    )));
                 }
             } else {
                 break;
@@ -304,7 +330,7 @@ fn parse_exp_1_op<'a>(
     Ok(())
 }
 
-fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     let token = state.input.iter().nth(0);
     if state.input.len() > 0 {
         state.input = &state.input[1..];
@@ -325,7 +351,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
             state.output.push(Exp::String(s.to_string()));
             Ok(())
         }
-        Some(Token::Keyword(_)) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        Some(Token::Keyword(_)) => Err(Err::Error((
+            &state.input[..],
+            MmmmParseError::UnexpectedToken,
+        ))),
         Some(Token::Special(name)) => {
             state
                 .output
@@ -343,9 +372,15 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<
         | Some(Token::OpenBracket)
         | Some(Token::FnReturnType)
         | Some(Token::Assign)
-        | Some(Token::TimeAt) => Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
+        | Some(Token::TimeAt) => Err(Err::Error((
+            &state.input[..],
+            MmmmParseError::UnexpectedToken,
+        ))),
         Some(Token::Comma) => Ok(()),
-        Some(Token::Colon) => Err(Err::Error((&state.input[1..], ErrorKind::IsNot))),
+        Some(Token::Colon) => Err(Err::Error((
+            &state.input[1..],
+            MmmmParseError::UnexpectedToken,
+        ))),
         Some(Token::Newline)
         | Some(Token::CloseParen)
         | Some(Token::CloseBracket)
@@ -379,7 +414,7 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
 }
 
 /// 操車場アルゴリズムでトークン列から式オブジェクトを構築する
-fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
+fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     while !end_of_exp(state) {
         if let Err(err) = parse_exp_1(state) {
             return Err(err);
@@ -393,7 +428,7 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
     Ok(())
 }
 
-fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Exp> {
+fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     let mut state = ParseExpState {
         nest: 0,
         input: t,
@@ -407,21 +442,21 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Exp> {
             if let Some(exp) = state.output.pop() {
                 Ok((state.input, exp))
             } else {
-                Err(Err::Error((state.input, ErrorKind::IsNot)))
+                Err(Err::Error((state.input, ErrorKind::CannotParseExpression)))
             }
         }
         Err(err) => return Err(err),
     }
 }
 
-fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match parse_expression(t) {
         Ok((rest, exp)) => Ok((rest, Some(AST::Exp(Box::new(exp))))),
         Err(err) => Err(err),
     }
 }
 
-fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((
         token_type_of(Token::Identifier("".to_string())),
         token_type_of(Token::Assign),
@@ -441,7 +476,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     }
 }
 
-fn parse_return<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((token(Token::Keyword("return")), parse_expression_ast))(t) {
         Ok((rest, (_, Some(AST::Exp(exp))))) => {
             Ok((rest, Some(AST::Return(Box::new(*exp.clone())))))
@@ -452,7 +487,7 @@ fn parse_return<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>>
     }
 }
 
-fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<Declare>> {
+fn parse_function_args<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match delimited(
         token(Token::OpenParen),
         separated_list(
@@ -490,7 +525,7 @@ fn parse_function_args<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<D
     }
 }
 
-fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<AST>> {
+fn parse_function_body<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     // parse function body
     match delimited(
         token(Token::OpenBrace),
@@ -515,7 +550,7 @@ fn parse_function_body<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Vec<A
     }
 }
 
-fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((
         opt(many0(token(Token::Newline))),
         token(Token::Keyword("fn")),
@@ -561,7 +596,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
     }
 }
 
-fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     alt((
         value(None, token(Token::Newline)),
         parse_function_definition,
@@ -570,7 +605,7 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
     ))(t)
 }
 
-pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
+pub fn parse<'a>(t: &'a [Token]) -> ParseResult<'a> {
     let mut asts = Vec::new();
     let mut input = t;
 
