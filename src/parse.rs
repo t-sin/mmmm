@@ -632,23 +632,12 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>],
 }
 
 fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
-    match alt((
+    alt((
+        value(None, token(Token::Newline)),
         parse_function_definition,
         parse_assignment,
         parse_expression,
-        value(None, token(Token::Newline)),
     ))(t)
-    {
-        Ok((t, None)) => {
-            if t.len() > 0 {
-                Ok((&t[1..], None))
-            } else {
-                Ok((t, None))
-            }
-        }
-        Ok((t, ast)) => Ok((t, ast)),
-        Err(err) => Err(err),
-    }
 }
 
 pub fn parse<'a>(t: &'a [Token]) -> IResult<&'a [Token<'a>], Vec<AST>> {
