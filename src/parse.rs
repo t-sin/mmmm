@@ -130,60 +130,6 @@ struct ParseExpState<'a> {
     prev_token: Option<Token<'a>>,
 }
 
-fn parse_funcall_args<'a>(
-    state: &mut ParseExpState<'a>,
-) -> Result<Vec<Exp>, Err<(&'a [Token<'a>], ErrorKind)>> {
-    let mut args = Vec::new();
-    let mut separated = false;
-
-    loop {
-        match state.input.iter().nth(0) {
-            Some(Token::OpenParen) => {
-                state.input = &state.input[1..];
-                state.prev_token = Some(Token::OpenParen);
-                separated = true;
-            }
-            Some(Token::CloseParen) => {
-                state.input = &state.input[1..];
-                state.prev_token = Some(Token::CloseParen);
-                break;
-            }
-            Some(Token::Comma) => {
-                separated = true;
-                state.input = &state.input[1..];
-                state.prev_token = Some(Token::Comma)
-            }
-            Some(_) => (),
-            None => return Err(Err::Error((&state.input[..], ErrorKind::IsNot))),
-        }
-
-        if separated {
-            let mut arg_state = ParseExpState {
-                nest: state.nest + 1,
-                input: state.input,
-                output: Vec::new(),
-                stack: Vec::new(),
-                prev_token: None,
-            };
-
-            if let Err(err) = parse_exp(&mut arg_state) {
-                return Err(err);
-            } else {
-                if let Some(exp) = arg_state.output.pop() {
-                    args.push(exp);
-                    separated = false;
-                } else {
-                    return Err(Err::Error((&state.input[..], ErrorKind::IsNot)));
-                }
-            }
-            state.input = arg_state.input;
-            state.prev_token = arg_state.prev_token;
-        }
-    }
-
-    Ok(args)
-}
-
 fn terminate_parse_exp_1<'a>(
     state: &mut ParseExpState<'a>,
 ) -> Result<(), Err<(&'a [Token<'a>], ErrorKind)>> {
@@ -249,12 +195,20 @@ fn parse_exp_1_identifier<'a>(
     match state.input.iter().nth(0) {
         Some(Token::OpenParen) => {
             // function invokation
-            let args = match parse_funcall_args(state) {
-                Ok(args) => args,
+            match delimited(
+                token(Token::OpenParen),
+                separated_list(token(Token::Comma), parse_expression),
+                token(Token::CloseParen),
+            )(state.input)
+            {
+                Ok((rest, args)) => {
+                    state.input = rest;
+                    state.prev_token = Some(Token::CloseParen);
+                    let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
+                    state.output.push(exp);
+                }
                 Err(err) => return Err(err),
             };
-            let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
-            state.output.push(exp);
         }
         Some(Token::OpenBracket) => match parse_array_access(state) {
             Ok(exp) => {
@@ -466,7 +420,7 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> Result<(), Err<(&'a [Token<'a
     Ok(())
 }
 
-fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Exp> {
     let mut state = ParseExpState {
         nest: 0,
         input: t,
@@ -478,11 +432,18 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     match parse_exp(&mut state) {
         Ok(()) => {
             if let Some(exp) = state.output.pop() {
-                Ok((state.input, Some(AST::Exp(Box::new(exp)))))
+                Ok((state.input, exp))
             } else {
-                Ok((state.input, None))
+                Err(Err::Error((state.input, ErrorKind::IsNot)))
             }
         }
+        Err(err) => return Err(err),
+    }
+}
+
+fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
+    match parse_expression(t) {
+        Ok((rest, exp)) => Ok((rest, Some(AST::Exp(Box::new(exp))))),
         Err(err) => Err(err),
     }
 }
@@ -491,7 +452,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
     match permutation((
         token_type_of(Token::Identifier("".to_string())),
         token_type_of(Token::Assign),
-        parse_expression,
+        parse_expression_ast,
     ))(t)
     {
         Ok((rest, (Token::Identifier(name), _, ref ast))) => {
@@ -508,7 +469,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<A
 }
 
 fn parse_return<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
-    match permutation((token(Token::Keyword("return")), parse_expression))(t) {
+    match permutation((token(Token::Keyword("return")), parse_expression_ast))(t) {
         Ok((rest, (_, Some(AST::Exp(exp))))) => {
             Ok((rest, Some(AST::Return(Box::new(*exp.clone())))))
         }
@@ -632,7 +593,7 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> IResult<&'a [Token<'a>], Option<AST>> {
         value(None, token(Token::Newline)),
         parse_function_definition,
         parse_assignment,
-        parse_expression,
+        parse_expression_ast,
     ))(t)
 }
 
