@@ -8,16 +8,18 @@ use nom::{Err, IResult};
 
 /// Represents errors while parsing.
 pub enum MmmmParseError<I> {
-    Nom((I, ErrorKind)),
+    Nom(String),
     ExpressionStackIsEmpty,
     UnexpectedToken,
     UnexpectedEof,
     CannotParseExpression,
 }
 
-impl<'a, I> ParseError<I> for MmmmParseError<I> {
-    fn from_error_kind(input: I, kind: ErrorKind) -> Self {
-        MmmmParseError::Nom((input, kind))
+type Input<'a> = &'a [Token<'a>];
+
+impl<I> ParseError<I> for (I, MmmmParseError<I>) {
+    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
+        MmmmParseError::Nom(kind.description())
     }
 
     fn append(_: I, _: ErrorKind, other: Self) -> Self {
@@ -26,11 +28,9 @@ impl<'a, I> ParseError<I> for MmmmParseError<I> {
 }
 
 type CombinatorResult<'a> =
-    IResult<&'a [Token<'a>], &'a Token<'a>, (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
-type ParseExp1Result<'a> =
-    IResult<&'a [Token<'a>], (), (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
-type ParseResult<'a> =
-    IResult<&'a [Token<'a>], Option<AST>, (&'a [Token<'a>], MmmmParseError<&'a [Token<'a>]>)>;
+    IResult<Input<'a>, &'a Token<'a>, (Input<'a>, MmmmParseError<Input<'a>>)>;
+type ParseExp1Result<'a> = IResult<Input<'a>, (), (Input<'a>, MmmmParseError<Input<'a>>)>;
+type ParseResult<'a> = IResult<Input<'a>, Option<AST>, (Input<'a>, MmmmParseError<Input<'a>>)>;
 
 /// Represents mmmm's operator associativity.
 enum OperatorAssociativity {
