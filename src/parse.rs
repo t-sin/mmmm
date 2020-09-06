@@ -1,6 +1,6 @@
 use crate::tokenize::{token_type_eq, Token};
 use nom::branch::{alt, permutation};
-use nom::combinator::{opt, rest_len, value};
+use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
 use nom::sequence::delimited;
 use nom::{Err, IResult};
@@ -655,27 +655,17 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 pub fn parse<'a>(t: &'a [Token]) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
-    let mut asts = Vec::new();
-    let mut input = t;
-
-    loop {
-        if input.len() == 0 {
-            break;
-        }
-
-        match parse_1(input) {
-            Ok((t, Some(ast))) => {
-                input = t;
-                asts.push(ast);
-            }
-            Ok((t, None)) => {
-                input = t;
-            }
-            Err(err) => return Err(err),
-        }
+    match all_consuming(many0(parse_1))(t) {
+        Ok((rest, astvec)) => Ok((
+            rest,
+            astvec
+                .into_iter()
+                .filter(|o| if let None = o { false } else { true })
+                .map(|o| o.unwrap())
+                .collect(),
+        )),
+        Err(err) => Err(err),
     }
-
-    Ok((input, asts))
 }
 
 #[cfg(test)]
