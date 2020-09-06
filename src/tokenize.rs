@@ -281,7 +281,7 @@ pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
         let (s, _) = opt(space0::<&str, (&str, ErrorKind)>)(input)?;
         input = s;
 
-        if s == "" {
+        if input == "" {
             break;
         }
 
