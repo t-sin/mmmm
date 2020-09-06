@@ -598,7 +598,6 @@ fn parse_function_body<'a>(
 
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((
-        opt(many0(token(Token::Newline))),
         token(Token::Keyword("fn")),
         many0(token(Token::Newline)),
         token_type_of(Token::Identifier("".to_string())),
@@ -612,10 +611,9 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
         ))),
         many0(token(Token::Newline)),
         parse_function_body,
-        opt(many0(token(Token::Newline))),
     ))(t)
     {
-        Ok((rest, (_, _, _, fn_name, _, args, _, fn_type, _, ast_vec, _))) => {
+        Ok((rest, (_, _, fn_name, _, args, _, fn_type, _, ast_vec))) => {
             Ok((
                 rest,
                 Some(AST::Defun(
