@@ -420,6 +420,8 @@ mod test_tokenize {
             Token::LineComment(" abcd".to_string()),
             "// abcd",
         );
+
+        test_tokenize_fn_with_error(&tokenize_line_comment, "self_hoge");
     }
 
     #[test]
