@@ -519,6 +519,7 @@ mod test_tokenize {
                 Token::Identifier("a".to_string()),
                 Token::Op("+"),
                 Token::Identifier("b".to_string()),
+                Token::Newline,
                 Token::LineComment("fff".to_string()),
             ],
             "//abc\na+b\n//fff",
