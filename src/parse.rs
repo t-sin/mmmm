@@ -453,21 +453,7 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
     }
 }
 
-/// 操車場アルゴリズムでトークン列から式オブジェクトを構築する
-fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
-    while !end_of_exp(state) {
-        if let Err(err) = parse_exp_1(state) {
-            return Err(err);
-        }
-    }
-
-    if let Err(err) = terminate_parse_exp_1(state) {
-        return Err(err);
-    }
-
-    Ok(())
-}
-
+/// Parses an expression.
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
     let mut state = ParseExpState {
         nest: 0,
@@ -477,18 +463,23 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
         prev_token: None,
     };
 
-    match parse_exp(&mut state) {
-        Ok(()) => {
-            if let Some(exp) = state.output.pop() {
-                Ok((state.input, exp))
-            } else {
-                Err(Err::Error(ParseError::new(
-                    state.input,
-                    ErrorKind::CannotParseExpression,
-                )))
-            }
+    while !end_of_exp(&mut state) {
+        if let Err(err) = parse_exp_1(&mut state) {
+            return Err(err);
         }
-        Err(err) => Err(err),
+    }
+
+    if let Err(err) = terminate_parse_exp_1(&mut state) {
+        return Err(err);
+    }
+
+    if let Some(exp) = state.output.pop() {
+        Ok((state.input, exp))
+    } else {
+        Err(Err::Error(ParseError::new(
+            state.input,
+            ErrorKind::CannotParseExpression,
+        )))
     }
 }
 
