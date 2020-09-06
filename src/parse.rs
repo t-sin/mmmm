@@ -523,15 +523,8 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
-    match permutation((token(Token::Keyword("return")), parse_expression_ast))(t) {
-        Ok((rest, (_, Some(AST::Exp(exp))))) => {
-            Ok((rest, Some(AST::Return(Box::new(*exp.clone())))))
-        }
-        Ok((rest, (_, Some(_)))) => Err(Err::Error(ParseError::new(
-            rest,
-            ErrorKind::CannotParseExpression,
-        ))),
-        Ok((rest, (_, None))) => Err(Err::Error(ParseError::new(rest, ErrorKind::UnexpectedEof))),
+    match permutation((token(Token::Keyword("return")), parse_expression))(t) {
+        Ok((rest, (_, exp))) => Ok((rest, Some(AST::Return(Box::new(exp))))),
         Err(err) => Err(err),
     }
 }
