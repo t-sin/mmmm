@@ -402,6 +402,27 @@ mod test_tokenize {
     }
 
     #[test]
+    fn test_tokenize_line_comment() {
+        test_tokenize_fn(
+            &tokenize_line_comment,
+            Token::LineComment("abcd".to_string()),
+            "//abcd\n",
+        );
+
+        test_tokenize_fn(
+            &tokenize_line_comment,
+            Token::LineComment(" abcd".to_string()),
+            "// abcd\n",
+        );
+
+        test_tokenize_fn(
+            &tokenize_line_comment,
+            Token::LineComment(" abcd".to_string()),
+            "// abcd",
+        );
+    }
+
+    #[test]
     fn test_tokenize_special_variables_including_identifier() {
         if let Ok(("now", Token::Keyword("now"))) = tokenize_keyword("nownow") {
             assert!(false)
@@ -486,5 +507,19 @@ mod test_tokenize {
             ],
             "fn func() -> void { return array[0]}",
         );
+    }
+
+    #[test]
+    fn test_tokenize_with_comment() {
+        test_tokenize_1(
+            vec![
+                Token::LineComment("abc".to_string()),
+                Token::Identifier("a".to_string()),
+                Token::Op("+"),
+                Token::Identifier("b".to_string()),
+                Token::LineComment("fff".to_string()),
+            ],
+            "//abc\na+b\n//fff",
+        )
     }
 }
