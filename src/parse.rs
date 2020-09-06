@@ -264,16 +264,12 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
 }
 
 fn parse_exp_1_subexp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
-    println!("input = n{:?}", state);
-    // precedes paren expression
-    let res = delimited(
+    match delimited(
         token(Token::OpenParen),
         parse_expression,
         token(Token::CloseParen),
-    )(state.input);
-    println!("res = {:?}", res);
-
-    match res {
+    )(state.input)
+    {
         Ok((rest, exp)) => {
             state.input = rest;
             state.prev_token = Some(Token::CloseParen);
@@ -364,6 +360,7 @@ fn parse_exp_1_op<'a>(
 
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     let token = state.input.iter().nth(0);
+    let input = state.input;
     if state.input.len() > 0 {
         state.input = &state.input[1..];
     }
@@ -394,7 +391,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             Ok(())
         }
         Some(Token::Identifier(name)) => parse_exp_1_identifier(name, state),
-        Some(Token::OpenParen) => parse_exp_1_subexp(state),
+        Some(Token::OpenParen) => {
+            state.input = input;
+            parse_exp_1_subexp(state)
+        }
         Some(Token::Op(op1)) => {
             let result = parse_exp_1_op(op1, Some(token.unwrap().clone()), state);
             state.prev_token = Some(token.unwrap().clone());
