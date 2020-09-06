@@ -1,36 +1,57 @@
 use crate::tokenize::{token_type_eq, Token};
 use nom::branch::{alt, permutation};
 use nom::combinator::{opt, rest_len, value};
-use nom::error::{ErrorKind, ParseError};
 use nom::multi::{many0, separated_list};
 use nom::sequence::delimited;
 use nom::{Err, IResult};
 
-/// Represents errors while parsing.
-pub enum MmmmParseError<I> {
-    Nom(String),
+/// Represents error types while parsing.
+#[derive(Debug)]
+pub enum ErrorKind<'a> {
+    Nom(nom::error::ErrorKind),
+    Incomplete(),
     ExpressionStackIsEmpty,
-    UnexpectedToken,
+    UnexpectedToken(Token<'a>),
     UnexpectedEof,
     CannotParseExpression,
 }
 
-type Input<'a> = &'a [Token<'a>];
+/// Represents parser errors.
+///
+/// Note: it's not a nom::error::ParseError.
+#[derive(Debug)]
+pub struct ParseError<'a, I> {
+    input: I,
+    kind: ErrorKind<'a>,
+}
 
-impl<I> ParseError<I> for (I, MmmmParseError<I>) {
-    fn from_error_kind(_: I, kind: ErrorKind) -> Self {
-        MmmmParseError::Nom(kind.description())
+impl<'a, I> ParseError<'a, I> {
+    fn new(input: I, kind: ErrorKind<'a>) -> Self {
+        ParseError {
+            input: input,
+            kind: kind,
+        }
+    }
+}
+
+impl<'a, I> nom::error::ParseError<I> for ParseError<'a, I> {
+    fn from_error_kind(input: I, kind: nom::error::ErrorKind) -> Self {
+        ParseError {
+            input: input,
+            kind: ErrorKind::Nom(kind),
+        }
     }
 
-    fn append(_: I, _: ErrorKind, other: Self) -> Self {
+    fn append(_: I, _: nom::error::ErrorKind, other: Self) -> Self {
         other
     }
 }
 
-type CombinatorResult<'a> =
-    IResult<Input<'a>, &'a Token<'a>, (Input<'a>, MmmmParseError<Input<'a>>)>;
-type ParseExp1Result<'a> = IResult<Input<'a>, (), (Input<'a>, MmmmParseError<Input<'a>>)>;
-type ParseResult<'a> = IResult<Input<'a>, Option<AST>, (Input<'a>, MmmmParseError<Input<'a>>)>;
+type Input<'a> = &'a [Token<'a>];
+type CombinatorResult<'a> = IResult<Input<'a>, &'a Token<'a>, ParseError<'a, Input<'a>>>;
+type ParseExp1Result<'a> = Result<(), Err<ParseError<'a, Input<'a>>>>;
+type ParseExpResult<'a> = IResult<Input<'a>, Exp, ParseError<'a, Input<'a>>>;
+type ParseResult<'a> = IResult<Input<'a>, Option<AST>, ParseError<'a, Input<'a>>>;
 
 /// Represents mmmm's operator associativity.
 enum OperatorAssociativity {
@@ -47,10 +68,16 @@ fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'
             if &t[0] == &token {
                 Ok((&t[1..], &t[0]))
             } else {
-                Err(Err::Error((&t[..], MmmmParseError::UnexpectedToken)))
+                Err(Err::Error(ParseError::new(
+                    &t[..],
+                    ErrorKind::UnexpectedToken(t[0].clone()),
+                )))
             }
         } else {
-            Err(Err::Error((&t[..], MmmmParseError::UnexpectedEof)))
+            Err(Err::Error(ParseError::new(
+                &t[..],
+                ErrorKind::UnexpectedEof,
+            )))
         }
     }
 }
@@ -65,10 +92,16 @@ fn token_type_of<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> Combinator
             if token_type_eq(&t[0], &token) {
                 Ok((&t[1..], &t[0]))
             } else {
-                Err(Err::Error(MmmmParseError::UnexpectedToken))
+                Err(Err::Error(ParseError::new(
+                    &t[..],
+                    ErrorKind::UnexpectedToken(t[0].clone()),
+                )))
             }
         } else {
-            Err(Err::Error(MmmmParseError::UnexpectedEof))
+            Err(Err::Error(ParseError::new(
+                &t[..],
+                ErrorKind::UnexpectedEof,
+            )))
         }
     }
 }
@@ -162,23 +195,23 @@ fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'
                     let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
                     state.output.push(exp);
                 } else {
-                    return Err(Err::Error((
+                    return Err(Err::Error(ParseError::new(
                         &state.input[..],
-                        MmmmParseError::ExpressionStackIsEmpty,
+                        ErrorKind::ExpressionStackIsEmpty,
                     )));
                 }
             }
             None => break,
             _ => {
-                return Err(Err::Error((
+                return Err(Err::Error(ParseError::new(
                     &state.input[..],
-                    MmmmParseError::ExpressionStackIsEmpty,
+                    ErrorKind::ExpressionStackIsEmpty,
                 )))
             }
         }
     }
 
-    Ok((state.input, ()))
+    Ok(())
 }
 
 fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
@@ -279,9 +312,9 @@ fn parse_exp_1_op<'a>(
                 let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
                 state.output.push(exp);
             } else {
-                return Err(Err::Error((
+                return Err(Err::Error(ParseError::new(
                     &state.input[..],
-                    MmmmParseError::ExpressionStackIsEmpty,
+                    ErrorKind::ExpressionStackIsEmpty,
                 )));
             }
         }
@@ -315,9 +348,9 @@ fn parse_exp_1_op<'a>(
                         Box::new(exp2),
                     ));
                 } else {
-                    return Err(Err::Error((
+                    return Err(Err::Error(ParseError::new(
                         &state.input[..],
-                        MmmmParseError::ExpressionStackIsEmpty,
+                        ErrorKind::ExpressionStackIsEmpty,
                     )));
                 }
             } else {
@@ -351,9 +384,9 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             state.output.push(Exp::String(s.to_string()));
             Ok(())
         }
-        Some(Token::Keyword(_)) => Err(Err::Error((
+        Some(Token::Keyword(_)) => Err(Err::Error(ParseError::new(
             &state.input[..],
-            MmmmParseError::UnexpectedToken,
+            ErrorKind::UnexpectedToken(token.unwrap().clone()),
         ))),
         Some(Token::Special(name)) => {
             state
@@ -372,14 +405,14 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
         | Some(Token::OpenBracket)
         | Some(Token::FnReturnType)
         | Some(Token::Assign)
-        | Some(Token::TimeAt) => Err(Err::Error((
+        | Some(Token::TimeAt) => Err(Err::Error(ParseError::new(
             &state.input[..],
-            MmmmParseError::UnexpectedToken,
+            ErrorKind::UnexpectedToken(token.unwrap().clone()),
         ))),
         Some(Token::Comma) => Ok(()),
-        Some(Token::Colon) => Err(Err::Error((
+        Some(Token::Colon) => Err(Err::Error(ParseError::new(
             &state.input[1..],
-            MmmmParseError::UnexpectedToken,
+            ErrorKind::UnexpectedToken(token.unwrap().clone()),
         ))),
         Some(Token::Newline)
         | Some(Token::CloseParen)
@@ -428,7 +461,7 @@ fn parse_exp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     Ok(())
 }
 
-fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
     let mut state = ParseExpState {
         nest: 0,
         input: t,
@@ -442,10 +475,13 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
             if let Some(exp) = state.output.pop() {
                 Ok((state.input, exp))
             } else {
-                Err(Err::Error((state.input, ErrorKind::CannotParseExpression)))
+                Err(Err::Error(ParseError::new(
+                    state.input,
+                    ErrorKind::CannotParseExpression,
+                )))
             }
         }
-        Err(err) => return Err(err),
+        Err(err) => Err(err),
     }
 }
 
@@ -468,10 +504,13 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
                 let ast = AST::Assign(Box::new(Symbol(name.to_string())), (*exp).clone());
                 Ok((rest, Some(ast)))
             } else {
-                Err(Err::Error((rest, ErrorKind::IsNot)))
+                Err(Err::Error(ParseError::new(rest, ErrorKind::UnexpectedEof)))
             }
         }
-        Ok((rest, (_, _, _))) => Err(Err::Error((rest, ErrorKind::IsNot))),
+        Ok((rest, (_, _, _))) => Err(Err::Error(ParseError::new(
+            rest,
+            ErrorKind::UnexpectedToken(Token::Newline),
+        ))),
         Err(err) => Err(err),
     }
 }
@@ -481,13 +520,18 @@ fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
         Ok((rest, (_, Some(AST::Exp(exp))))) => {
             Ok((rest, Some(AST::Return(Box::new(*exp.clone())))))
         }
-        Ok((rest, (_, Some(_)))) => Err(Err::Error((rest, ErrorKind::IsNot))),
-        Ok((rest, (_, None))) => Err(Err::Error((rest, ErrorKind::IsNot))),
+        Ok((rest, (_, Some(_)))) => Err(Err::Error(ParseError::new(
+            rest,
+            ErrorKind::CannotParseExpression,
+        ))),
+        Ok((rest, (_, None))) => Err(Err::Error(ParseError::new(rest, ErrorKind::UnexpectedEof))),
         Err(err) => Err(err),
     }
 }
 
-fn parse_function_args<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_function_args<'a>(
+    t: &'a [Token<'a>],
+) -> IResult<Input<'a>, Vec<Declare>, ParseError<'a, Input<'a>>> {
     match delimited(
         token(Token::OpenParen),
         separated_list(
@@ -525,7 +569,9 @@ fn parse_function_args<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     }
 }
 
-fn parse_function_body<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_function_body<'a>(
+    t: &'a [Token<'a>],
+) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
     // parse function body
     match delimited(
         token(Token::OpenBrace),
@@ -577,7 +623,10 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
                     if let Token::Identifier(name) = fn_name {
                         Box::new(Symbol(name.to_string()))
                     } else {
-                        return Err(Err::Error((rest, ErrorKind::IsNot)));
+                        return Err(Err::Error(ParseError::new(
+                            rest,
+                            ErrorKind::UnexpectedToken(fn_name.clone()),
+                        )));
                     },
                     // function args
                     args,
@@ -605,7 +654,7 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     ))(t)
 }
 
-pub fn parse<'a>(t: &'a [Token]) -> ParseResult<'a> {
+pub fn parse<'a>(t: &'a [Token]) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
     let mut asts = Vec::new();
     let mut input = t;
 
