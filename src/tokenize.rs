@@ -383,6 +383,7 @@ mod test_tokenize {
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("void"), "void");
         test_tokenize_fn(&tokenize_keyword, Token::Keyword("float"), "float");
     }
+
     #[test]
     fn test_tokenize_keyword_including_identifier() {
         if let Ok(("1", Token::Keyword("fn"))) = tokenize_keyword("fn1") {
