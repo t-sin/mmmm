@@ -576,6 +576,7 @@ fn parse_function_body<'a>(
     match delimited(
         token(Token::OpenBrace),
         opt(many0(alt((
+            parse_expression_ast,
             parse_assignment,
             parse_return,
             value(None, token(Token::Newline)),
