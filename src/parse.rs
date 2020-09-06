@@ -9,7 +9,6 @@ use nom::{Err, IResult};
 #[derive(Debug)]
 pub enum ErrorKind<'a> {
     Nom(nom::error::ErrorKind),
-    Incomplete(),
     ExpressionStackIsEmpty,
     UnexpectedToken(Token<'a>),
     UnexpectedEof,
