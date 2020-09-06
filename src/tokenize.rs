@@ -1,7 +1,9 @@
 use nom::branch::{alt, permutation};
-use nom::bytes::complete::{is_not, tag};
-use nom::character::complete::{char, digit1, line_ending, none_of, one_of, space0, space1};
-use nom::combinator::{all_consuming, map, opt, peek};
+use nom::bytes::complete::tag;
+use nom::character::complete::{
+    char, digit1, line_ending, none_of, not_line_ending, one_of, space0, space1,
+};
+use nom::combinator::{all_consuming, map, opt, peek, rest, verify};
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
@@ -268,9 +270,15 @@ fn tokenize_newline(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_line_comment(s: &str) -> IResult<&str, Token> {
-    let (s, (_, comment, _)) = permutation((tag("//"), many0(is_not("\n")), opt(line_ending)))(s)?;
-    let comment: String = comment.into_iter().collect();
-    Ok((s, Token::LineComment(comment)))
+    let (s, (_, comment, _)) = permutation((
+        tag("//"),
+        not_line_ending,
+        alt((
+            line_ending,
+            verify(peek(rest), |rest: &str| rest.len() == 0),
+        )),
+    ))(s)?;
+    Ok((s, Token::LineComment(comment.to_string())))
 }
 
 pub fn tokenize(s: &str) -> IResult<&str, Vec<Token>> {
