@@ -25,6 +25,7 @@ pub struct ParseError<'a, I> {
 }
 
 impl<'a, I> ParseError<'a, I> {
+    /// creates ParseError from ErrorKind
     fn new(input: I, kind: ErrorKind<'a>) -> Self {
         ParseError {
             input: input,
@@ -34,6 +35,7 @@ impl<'a, I> ParseError<'a, I> {
 }
 
 impl<'a, I> nom::error::ParseError<I> for ParseError<'a, I> {
+    /// converts nom::error::ErrorKind to mmmm's ParseError
     fn from_error_kind(input: I, kind: nom::error::ErrorKind) -> Self {
         ParseError {
             input: input,
@@ -46,10 +48,16 @@ impl<'a, I> nom::error::ParseError<I> for ParseError<'a, I> {
     }
 }
 
+/// a type of parser's input
 type Input<'a> = &'a [Token<'a>];
+
+/// a return value type of combinators defined this file
 type CombinatorResult<'a> = IResult<Input<'a>, &'a Token<'a>, ParseError<'a, Input<'a>>>;
+/// a return value type of expression parts parser
 type ParseExp1Result<'a> = Result<(), Err<ParseError<'a, Input<'a>>>>;
+/// a return value type of expression parser
 type ParseExpResult<'a> = IResult<Input<'a>, Exp, ParseError<'a, Input<'a>>>;
+/// a return value type of parser
 type ParseResult<'a> = IResult<Input<'a>, Option<AST>, ParseError<'a, Input<'a>>>;
 
 /// Represents mmmm's operator associativity.
