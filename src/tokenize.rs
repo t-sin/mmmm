@@ -1,7 +1,7 @@
 use nom::branch::{alt, permutation};
 use nom::bytes::complete::{is_not, tag};
 use nom::character::complete::{char, digit1, line_ending, none_of, one_of, space0, space1};
-use nom::combinator::{all_consuming, opt};
+use nom::combinator::{all_consuming, map, opt, peek};
 use nom::error::ErrorKind;
 use nom::multi::{many0, many1};
 use nom::sequence::tuple;
@@ -160,7 +160,11 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
             tag("float"),
             tag("void"),
         )),
-        alt((space1, all_consuming(space0))),
+        alt((
+            space1,
+            all_consuming(space0),
+            peek(map(one_of("{}()[]"), |_: char| "")),
+        )),
     ))(s)?;
     Ok((s, Token::Keyword(name)))
 }
