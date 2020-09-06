@@ -541,7 +541,7 @@ fn parse_function_args<'a>(
                 // function return type
                 opt(permutation((
                     token(Token::Colon),
-                    token_type_of(Token::Identifier("".to_string())),
+                    token_type_of(Token::Keyword("")),
                 ))),
             )),
         ),
@@ -552,7 +552,7 @@ fn parse_function_args<'a>(
             rest,
             args.into_iter()
                 .map(|t| match t {
-                    (Token::Identifier(name), Some((_, Token::Identifier(type_name)))) => {
+                    (Token::Identifier(name), Some((_, Token::Keyword(type_name)))) => {
                         Declare::Var(
                             Box::new(Symbol(name.to_string())),
                             Some(Symbol(type_name.to_string())),
