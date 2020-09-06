@@ -1227,6 +1227,16 @@ mod test_parse {
             )],
             "fn loop()->void {}",
         );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("loop".to_string())),
+                vec![],
+                Some(Symbol("void".to_string())),
+                vec![],
+            )],
+            "fn loop()->void{}",
+        );
     }
 
     #[test]
