@@ -129,6 +129,9 @@ pub enum Exp {
     PostOp(String, Box<Symbol>, Box<Exp>),
 }
 
+/// Represents variable declaration with type.
+///
+/// The type may be None when omitted by user.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Declare {
     Var(Box<Symbol>, Option<Symbol>),
@@ -194,6 +197,11 @@ struct ParseExpState<'a> {
     prev_token: Option<Token<'a>>,
 }
 
+/// Terminates shunting-yard algorithm with ParseExpState.
+///
+/// In this phase, it pops an operator token from the operator stack in state, the operator have low precedence
+/// in `parse_exp_1_op`, then it pops their operands from the output queue and make Exp::BinaryOp.
+/// When the output queue is empty while making Exp::BinaryOp, rise error ErrorKind::ExpressionStackIsEmpty.
 fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     loop {
         match state.stack.pop() {
@@ -221,6 +229,16 @@ fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'
     Ok(())
 }
 
+/// Parses identifiers related expressions.
+///
+/// This function parses three kind of expressions:
+///
+///  - function invokation
+///  - array accessing
+///  - variable accessing
+///
+/// Three kind of expressions above are proceeded by an identifier, so this function distinguishes by
+/// checking next token in ParseExpState.
 fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     match state.input.iter().nth(0) {
         Some(Token::OpenParen) => {
@@ -271,6 +289,7 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
     Ok(())
 }
 
+/// Parses sub expressions delimited by '(' and ')'.
 fn parse_exp_1_subexp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     match delimited(
         token(Token::OpenParen),
@@ -288,6 +307,9 @@ fn parse_exp_1_subexp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> 
     }
 }
 
+/// Distinguishes wheather the token `op` is unary operators.
+///
+/// For example, unary `-` token, to determine it is unary `-` it must be know previous token.
 fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
     match op {
         "-" => match prev_token {
@@ -302,6 +324,10 @@ fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
     }
 }
 
+/// Parses unary/binary operators.
+///
+/// This algorithm is based on shunting-yard algorithm but few points are modified.
+/// That point is immediately creating AST.
 fn parse_exp_1_op<'a>(
     op1: &str,
     token: Option<Token<'a>>,
@@ -366,6 +392,9 @@ fn parse_exp_1_op<'a>(
     Ok(())
 }
 
+/// Parse a part of expressions.
+///
+/// Parsing expressions is a process that loops this function unless at the end of expressions (see `end_of_exp()`).
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     let token = state.input.iter().nth(0);
     let input = state.input;
@@ -437,6 +466,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     result
 }
 
+/// Determines if the expression parsing is at the end of expression.
+///
+/// The expression parser meets end-of-expression things, e.g. closing delimiter,
+/// the parser exits its process by this function.
 fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
     if state.input.len() == 0 {
         return true;
@@ -454,6 +487,11 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
 }
 
 /// Parses an expression.
+///
+/// The purpose is parsing expression including infix notation by operator precedence,
+/// so here uses shunting-yard algorithm.
+/// This loops parsing towards end of expressions, then collecting rest operators and its operands,
+/// then returns the result.
 fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
     let mut state = ParseExpState {
         nest: 0,
@@ -483,6 +521,10 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
     }
 }
 
+/// Parses an expressions as AST.
+///
+/// The `parse_expression` returns Exp type because of recursive call in parsing expression.
+/// But, entirely, the most parsing functions returns `Option<AST>` so this function wraps it.
 fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match parse_expression(t) {
         Ok((rest, exp)) => Ok((rest, Some(AST::Exp(Box::new(exp))))),
@@ -490,6 +532,7 @@ fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     }
 }
 
+/// Parses assinment statement.
 fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((
         token_type_of(Token::Identifier("".to_string())),
@@ -513,6 +556,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     }
 }
 
+/// Parses return statement.
 fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((token(Token::Keyword("return")), parse_expression))(t) {
         Ok((rest, (_, exp))) => Ok((rest, Some(AST::Return(Box::new(exp))))),
@@ -520,6 +564,11 @@ fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     }
 }
 
+/// Parses function arguments list in function definition.
+///
+/// The function argument types might be omitted by each arguments, so the the type specifier's
+/// type is Option<Symbol>.
+/// It is same behaviour with `parse_function_definitions`.
 fn parse_function_args<'a>(
     t: &'a [Token<'a>],
 ) -> IResult<Input<'a>, Vec<Declare>, ParseError<'a, Input<'a>>> {
@@ -560,6 +609,9 @@ fn parse_function_args<'a>(
     }
 }
 
+/// Parses a function body in function definitions.
+///
+/// Here, empty lines are allowed.
 fn parse_function_body<'a>(
     t: &'a [Token<'a>],
 ) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
@@ -588,6 +640,11 @@ fn parse_function_body<'a>(
     }
 }
 
+/// Parses a function definition.
+///
+/// The function return type might be omitted, so the the type specifier's
+/// type is Option<Symbol>.
+/// It is same behaviour with `parse_function_args`.
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match permutation((
         token(Token::Keyword("fn")),
@@ -635,6 +692,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     }
 }
 
+/// Parses a statement in the toplevel.
 fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     alt((
         value(None, token(Token::Newline)),
@@ -644,6 +702,7 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     ))(t)
 }
 
+/// Parses all toplevel statatements from the input.
 pub fn parse<'a>(t: &'a [Token]) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
     match all_consuming(many0(parse_1))(t) {
         Ok((rest, astvec)) => Ok((
