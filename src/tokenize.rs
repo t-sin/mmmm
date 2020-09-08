@@ -1,4 +1,4 @@
-use nom::branch::{alt, permutation};
+use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
     char, digit1, line_ending, none_of, not_line_ending, one_of, space0, space1,
@@ -128,7 +128,7 @@ fn tokenize_int(s: &str) -> IResult<&str, f64> {
 }
 
 fn tokenize_fract(s: &str) -> IResult<&str, f64> {
-    let (s, (_, frac)) = permutation((char('.'), digit1))(s)?;
+    let (s, (_, frac)) = tuple((char('.'), digit1))(s)?;
     let frac = frac.parse::<f64>().unwrap() / 10f64.powf(frac.len() as f64);
     Ok((s, frac))
 }
@@ -153,7 +153,7 @@ fn tokenize_float(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
-    let (s, (name, _)) = permutation((
+    let (s, (name, _)) = tuple((
         alt((
             tag("fn"),
             tag("return"),
@@ -172,9 +172,13 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
-    let (s, (name, _)) = permutation((
+    let (s, (name, _)) = tuple((
         alt((tag("now"), tag("self"))),
-        alt((space1, all_consuming(space0))),
+        alt((
+            space1,
+            peek(map(one_of("{}()[]"), |_: char| "")),
+            all_consuming(space0),
+        )),
     ))(s)?;
     Ok((s, Token::Special(name)))
 }
@@ -255,7 +259,7 @@ fn tokenize_identifier(s: &str) -> IResult<&str, Token> {
     let first_chars = [alpha, alpha_cap, underbar].concat();
     let rest_chars = [digits, alpha, alpha_cap, underbar].concat();
 
-    let (s, (first, rest)) = permutation((
+    let (s, (first, rest)) = tuple((
         many1(one_of(&first_chars[..])),
         many0(one_of(&rest_chars[..])),
     ))(s)?;
@@ -270,7 +274,7 @@ fn tokenize_newline(s: &str) -> IResult<&str, Token> {
 }
 
 fn tokenize_line_comment(s: &str) -> IResult<&str, Token> {
-    let (s, (_, comment, _)) = permutation((
+    let (s, (_, comment, _)) = tuple((
         tag("//"),
         not_line_ending,
         alt((
