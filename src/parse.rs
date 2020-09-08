@@ -1,8 +1,8 @@
 use crate::tokenize::{token_type_eq, Token};
-use nom::branch::{alt, permutation};
+use nom::branch::alt;
 use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
-use nom::sequence::delimited;
+use nom::sequence::{delimited, tuple};
 use nom::{Err, IResult};
 
 /// Represents error types while parsing.
@@ -534,7 +534,7 @@ fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 
 /// Parses assinment statement.
 fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
-    match permutation((
+    match tuple((
         token_type_of(Token::Identifier("".to_string())),
         token_type_of(Token::Assign),
         parse_expression_ast,
@@ -558,7 +558,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 
 /// Parses return statement.
 fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
-    match permutation((token(Token::Keyword("return")), parse_expression))(t) {
+    match tuple((token(Token::Keyword("return")), parse_expression))(t) {
         Ok((rest, (_, exp))) => Ok((rest, Some(AST::Return(Box::new(exp))))),
         Err(err) => Err(err),
     }
@@ -576,10 +576,10 @@ fn parse_function_args<'a>(
         token(Token::OpenParen),
         separated_list(
             token(Token::Comma),
-            permutation((
+            tuple((
                 token_type_of(Token::Identifier("".to_string())),
                 // function return type
-                opt(permutation((
+                opt(tuple((
                     token(Token::Colon),
                     token_type_of(Token::Keyword("")),
                 ))),
@@ -646,7 +646,7 @@ fn parse_function_body<'a>(
 /// type is Option<Symbol>.
 /// It is same behaviour with `parse_function_args`.
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
-    match permutation((
+    match tuple((
         token(Token::Keyword("fn")),
         many0(token(Token::Newline)),
         token_type_of(Token::Identifier("".to_string())),
@@ -654,7 +654,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
         parse_function_args,
         many0(token(Token::Newline)),
         // parse function return type
-        opt(permutation((
+        opt(tuple((
             token(Token::FnReturnType),
             token_type_of(Token::Keyword("")),
         ))),
