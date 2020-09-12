@@ -1,5 +1,3 @@
-use std::string::ToString;
-
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
