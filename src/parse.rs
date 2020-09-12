@@ -620,16 +620,16 @@ fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input
     // parse function body
     match delimited(
         token(Token::OpenBrace),
-        opt(many0(alt((
+        many0(alt((
             parse_expression_ast,
             parse_assignment,
             parse_return,
             value(None, token(Token::Newline)),
-        )))),
+        ))),
         token(Token::CloseBrace),
     )(t)
     {
-        Ok((rest, Some(ast_vec))) => Ok((
+        Ok((rest, ast_vec)) => Ok((
             rest,
             ast_vec
                 .into_iter()
@@ -637,7 +637,6 @@ fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input
                 .map(|o| o.unwrap())
                 .collect(),
         )),
-        Ok((rest, None)) => Ok((rest, Vec::new())),
         Err(err) => Err(err),
     }
 }
