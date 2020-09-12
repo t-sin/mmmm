@@ -1,4 +1,4 @@
-use crate::tokenize::{token_type_eq, Token};
+use crate::tokenize::{token_type_eq, Keyword, Special, Token};
 use nom::branch::alt;
 use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
@@ -122,6 +122,7 @@ pub struct Symbol(String);
 pub enum Exp {
     Float(f64),
     String(String),
+    Special(Box<Special>),
     Variable(Box<Symbol>),
     InvokeFn(Box<Symbol>, Vec<Exp>),
     UnaryOp(String, Box<Exp>),
@@ -134,7 +135,7 @@ pub enum Exp {
 /// The type may be None when omitted by user.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Declare {
-    Var(Box<Symbol>, Option<Symbol>),
+    Var(Box<Symbol>, Option<Keyword>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -145,7 +146,7 @@ pub enum AST {
     Exp(Box<Exp>),
     Assign(Box<Symbol>, Box<Exp>),
     Return(Box<Exp>),
-    Defun(Box<Symbol>, Vec<Declare>, Option<Symbol>, Vec<AST>),
+    Defun(Box<Symbol>, Vec<Declare>, Option<Keyword>, Vec<AST>),
 }
 
 /// Gives associativity to the specified operator name.
@@ -421,10 +422,8 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             &state.input[..],
             ErrorKind::UnexpectedToken(token.unwrap().clone()),
         ))),
-        Some(Token::Special(name)) => {
-            state
-                .output
-                .push(Exp::Variable(Box::new(Symbol(name.to_string()))));
+        Some(Token::Special(sp)) => {
+            state.output.push(Exp::Special(sp.clone()));
             Ok(())
         }
         Some(Token::Identifier(name)) => parse_exp_1_identifier(name, state),
@@ -558,7 +557,11 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 
 /// Parses return statement.
 fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
-    match tuple((token(Token::Keyword("return")), parse_expression))(t) {
+    match tuple((
+        token(Token::Keyword(Box::new(Keyword::Return))),
+        parse_expression,
+    ))(t)
+    {
         Ok((rest, (_, exp))) => Ok((rest, Some(AST::Return(Box::new(exp))))),
         Err(err) => Err(err),
     }
@@ -581,7 +584,11 @@ fn parse_function_args<'a>(
                 // function return type
                 opt(tuple((
                     token(Token::Colon),
-                    token_type_of(Token::Keyword("")),
+                    // type names
+                    alt((
+                        token(Token::Keyword(Box::new(Keyword::Void))),
+                        token(Token::Keyword(Box::new(Keyword::Float))),
+                    )),
                 ))),
             )),
         ),
@@ -592,11 +599,8 @@ fn parse_function_args<'a>(
             rest,
             args.into_iter()
                 .map(|t| match t {
-                    (Token::Identifier(name), Some((_, Token::Keyword(type_name)))) => {
-                        Declare::Var(
-                            Box::new(Symbol(name.to_string())),
-                            Some(Symbol(type_name.to_string())),
-                        )
+                    (Token::Identifier(name), Some((_, Token::Keyword(kw)))) => {
+                        Declare::Var(Box::new(Symbol(name.to_string())), Some(*kw.clone()))
                     }
                     (Token::Identifier(name), None) => {
                         Declare::Var(Box::new(Symbol(name.to_string())), None)
@@ -647,7 +651,7 @@ fn parse_function_body<'a>(
 /// It is same behaviour with `parse_function_args`.
 fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
     match tuple((
-        token(Token::Keyword("fn")),
+        token(Token::Keyword(Box::new(Keyword::Fn))),
         many0(token(Token::Newline)),
         token_type_of(Token::Identifier("".to_string())),
         many0(token(Token::Newline)),
@@ -656,7 +660,10 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
         // parse function return type
         opt(tuple((
             token(Token::FnReturnType),
-            token_type_of(Token::Keyword("")),
+            alt((
+                token(Token::Keyword(Box::new(Keyword::Void))),
+                token(Token::Keyword(Box::new(Keyword::Float))),
+            )),
         ))),
         many0(token(Token::Newline)),
         parse_function_body,
@@ -679,7 +686,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
                     args,
                     // function return type
                     if let Some((_, Token::Keyword(type_name))) = fn_type {
-                        Some(Symbol(type_name.to_string()))
+                        Some(*type_name.clone())
                     } else {
                         None
                     },
@@ -1223,7 +1230,7 @@ mod test_parse {
                 Box::new(Symbol("func".to_string())),
                 vec![Declare::Var(
                     Box::new(Symbol("a".to_string())),
-                    Some(Symbol("float".to_string())),
+                    Some(Keyword::Float),
                 )],
                 None,
                 vec![],
@@ -1272,7 +1279,7 @@ mod test_parse {
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
                 vec![],
-                Some(Symbol("void".to_string())),
+                Some(Keyword::Void),
                 vec![],
             )],
             "fn loop()->void {}",
@@ -1282,7 +1289,7 @@ mod test_parse {
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
                 vec![],
-                Some(Symbol("void".to_string())),
+                Some(Keyword::Void),
                 vec![],
             )],
             "fn loop()->void{}",
@@ -1295,7 +1302,7 @@ mod test_parse {
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
                 vec![],
-                Some(Symbol("void".to_string())),
+                Some(Keyword::Void),
                 vec![],
             )],
             "fn loop()\n->void {}",

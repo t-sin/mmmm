@@ -1,3 +1,5 @@
+use std::string::ToString;
+
 use nom::branch::alt;
 use nom::bytes::complete::tag;
 use nom::character::complete::{
@@ -10,10 +12,50 @@ use nom::sequence::tuple;
 use nom::{Err, IResult};
 
 #[derive(Debug, PartialEq, Clone)]
+pub enum Keyword {
+    Fn,
+    Return,
+    If,
+    Else,
+    Float,
+    Void,
+}
+
+impl Keyword {
+    fn from_str(name: &str) -> Option<Keyword> {
+        match name {
+            "fn" => Some(Keyword::Fn),
+            "return" => Some(Keyword::Return),
+            "if" => Some(Keyword::If),
+            "else" => Some(Keyword::Else),
+            "float" => Some(Keyword::Float),
+            "void" => Some(Keyword::Void),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Special {
+    Now,
+    SelfVar,
+}
+
+impl Special {
+    fn from_str(name: &str) -> Option<Special> {
+        match name {
+            "now" => Some(Special::Now),
+            "self" => Some(Special::SelfVar),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub enum Token<'a> {
     Float(f64),
-    Keyword(&'a str),
-    Special(&'a str),
+    Keyword(Box<Keyword>),
+    Special(Box<Special>),
     Op(&'a str),
     Identifier(String),
     String(String),
@@ -168,7 +210,12 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
             peek(map(one_of("{}()[]"), |_: char| "")),
         )),
     ))(s)?;
-    Ok((s, Token::Keyword(name)))
+    if let Some(kw) = Keyword::from_str(name) {
+        Ok((s, Token::Keyword(Box::new(kw))))
+    } else {
+        // TODO: it should be original error
+        Err(Err::Error((s, ErrorKind::IsNot)))
+    }
 }
 
 fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
@@ -180,7 +227,12 @@ fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
             all_consuming(space0),
         )),
     ))(s)?;
-    Ok((s, Token::Special(name)))
+    if let Some(sp) = Special::from_str(name) {
+        Ok((s, Token::Special(Box::new(sp))))
+    } else {
+        // TODO: it should be original error
+        Err(Err::Error((s, ErrorKind::IsNot)))
+    }
 }
 
 fn tokenize_op(s: &str) -> IResult<&str, Token> {
@@ -388,17 +440,41 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize_keyword() {
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("fn"), "fn");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("return"), "return");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("if"), "if");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("else"), "else");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("void"), "void");
-        test_tokenize_fn(&tokenize_keyword, Token::Keyword("float"), "float");
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::Fn)),
+            "fn",
+        );
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::Return)),
+            "return",
+        );
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::If)),
+            "if",
+        );
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::Else)),
+            "else",
+        );
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::Void)),
+            "void",
+        );
+        test_tokenize_fn(
+            &tokenize_keyword,
+            Token::Keyword(Box::new(Keyword::Float)),
+            "float",
+        );
     }
 
     #[test]
     fn test_tokenize_keyword_including_identifier() {
-        if let Ok(("1", Token::Keyword("fn"))) = tokenize_keyword("fn1") {
+        if let Ok(("1", Token::Keyword(_))) = tokenize_keyword("fn1") {
             assert!(false)
         } else {
             assert!(true)
@@ -407,8 +483,16 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize_special_variable() {
-        test_tokenize_fn(&tokenize_special_variable, Token::Special("now"), "now");
-        test_tokenize_fn(&tokenize_special_variable, Token::Special("self"), "self");
+        test_tokenize_fn(
+            &tokenize_special_variable,
+            Token::Special(Box::new(Special::Now)),
+            "now",
+        );
+        test_tokenize_fn(
+            &tokenize_special_variable,
+            Token::Special(Box::new(Special::SelfVar)),
+            "self",
+        );
 
         test_tokenize_fn_with_error(&tokenize_keyword, "self_hoge");
     }
@@ -438,7 +522,7 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize_special_variables_including_identifier() {
-        if let Ok(("now", Token::Keyword("now"))) = tokenize_keyword("nownow") {
+        if let Ok(("now", Token::Keyword(_kw))) = tokenize_keyword("nownow") {
             assert!(false)
         } else {
             assert!(true)
@@ -475,7 +559,7 @@ mod test_tokenize {
                 Token::Op("-"),
                 Token::Float(127.0),
                 Token::Float(127.0),
-                Token::Special("now"),
+                Token::Special(Box::new(Special::Now)),
                 Token::Float(0.0),
             ],
             "-127 127 now 0",
@@ -505,14 +589,14 @@ mod test_tokenize {
 
         test_tokenize_1(
             vec![
-                Token::Keyword("fn"),
+                Token::Keyword(Box::new(Keyword::Fn)),
                 Token::Identifier("func".to_string()),
                 Token::OpenParen,
                 Token::CloseParen,
                 Token::FnReturnType,
-                Token::Keyword("void"),
+                Token::Keyword(Box::new(Keyword::Void)),
                 Token::OpenBrace,
-                Token::Keyword("return"),
+                Token::Keyword(Box::new(Keyword::Return)),
                 Token::Identifier("array".to_string()),
                 Token::OpenBracket,
                 Token::Float(0.0),
