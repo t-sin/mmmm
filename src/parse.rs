@@ -1,4 +1,4 @@
-use crate::tokenize::{token_type_eq, Keyword, Special, Token};
+use crate::tokenize::{token_type_eq, Keyword, Operator, Special, Token};
 use nom::branch::alt;
 use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
@@ -7,10 +7,10 @@ use nom::{Err, IResult};
 
 /// Represents error types while parsing.
 #[derive(Debug)]
-pub enum ErrorKind<'a> {
+pub enum ErrorKind {
     Nom(nom::error::ErrorKind),
     ExpressionStackIsEmpty,
-    UnexpectedToken(Token<'a>),
+    UnexpectedToken(Token),
     UnexpectedEof,
     CannotParseExpression,
 }
@@ -19,14 +19,14 @@ pub enum ErrorKind<'a> {
 ///
 /// Note: it's not a nom::error::ParseError.
 #[derive(Debug)]
-pub struct ParseError<'a, I> {
+pub struct ParseError<I> {
     input: I,
-    kind: ErrorKind<'a>,
+    kind: ErrorKind,
 }
 
-impl<'a, I> ParseError<'a, I> {
+impl<I> ParseError<I> {
     /// creates ParseError from ErrorKind
-    fn new(input: I, kind: ErrorKind<'a>) -> Self {
+    fn new(input: I, kind: ErrorKind) -> Self {
         ParseError {
             input: input,
             kind: kind,
@@ -34,7 +34,7 @@ impl<'a, I> ParseError<'a, I> {
     }
 }
 
-impl<'a, I> nom::error::ParseError<I> for ParseError<'a, I> {
+impl<I> nom::error::ParseError<I> for ParseError<I> {
     /// converts nom::error::ErrorKind to mmmm's ParseError
     fn from_error_kind(input: I, kind: nom::error::ErrorKind) -> Self {
         ParseError {
@@ -49,16 +49,16 @@ impl<'a, I> nom::error::ParseError<I> for ParseError<'a, I> {
 }
 
 /// a type of parser's input
-type Input<'a> = &'a [Token<'a>];
+type Input<'a> = &'a [Token];
 
 /// a return value type of combinators defined this file
-type CombinatorResult<'a> = IResult<Input<'a>, &'a Token<'a>, ParseError<'a, Input<'a>>>;
+type CombinatorResult<'a> = IResult<Input<'a>, &'a Token, ParseError<Input<'a>>>;
 /// a return value type of expression parts parser
-type ParseExp1Result<'a> = Result<(), Err<ParseError<'a, Input<'a>>>>;
+type ParseExp1Result<'a> = Result<(), Err<ParseError<Input<'a>>>>;
 /// a return value type of expression parser
-type ParseExpResult<'a> = IResult<Input<'a>, Exp, ParseError<'a, Input<'a>>>;
+type ParseExpResult<'a> = IResult<Input<'a>, Exp, ParseError<Input<'a>>>;
 /// a return value type of parser
-type ParseResult<'a> = IResult<Input<'a>, Option<AST>, ParseError<'a, Input<'a>>>;
+type ParseResult<'a> = IResult<Input<'a>, Option<AST>, ParseError<Input<'a>>>;
 
 /// Represents mmmm's operator associativity.
 enum OperatorAssociativity {
@@ -68,7 +68,7 @@ enum OperatorAssociativity {
 }
 
 /// Recognize one token.
-fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'a> {
+fn token<'a>(token: Token) -> impl Fn(&'a [Token]) -> CombinatorResult<'a> {
     move |t| {
         let (t, len) = rest_len(t)?;
         if len > 0 {
@@ -92,7 +92,7 @@ fn token<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'
 /// Recognize one token by checking token type.
 ///
 /// It means this combinator ignores enum variants' union value.
-fn token_type_of<'a>(token: Token<'a>) -> impl Fn(&'a [Token<'a>]) -> CombinatorResult<'a> {
+fn token_type_of<'a>(token: Token) -> impl Fn(&'a [Token]) -> CombinatorResult<'a> {
     move |t| {
         let (t, len) = rest_len(t)?;
         if len > 0 {
@@ -125,9 +125,9 @@ pub enum Exp {
     Special(Box<Special>),
     Variable(Box<Symbol>),
     InvokeFn(Box<Symbol>, Vec<Exp>),
-    UnaryOp(String, Box<Exp>),
-    BinaryOp(String, Box<Exp>, Box<Exp>),
-    PostOp(String, Box<Symbol>, Box<Exp>),
+    UnaryOp(Box<Operator>, Box<Exp>),
+    BinaryOp(Box<Operator>, Box<Exp>, Box<Exp>),
+    PostOp(Box<Operator>, Box<Symbol>, Box<Exp>),
 }
 
 /// Represents variable declaration with type.
@@ -150,34 +150,36 @@ pub enum AST {
 }
 
 /// Gives associativity to the specified operator name.
-fn operator_associativity(op: &str) -> OperatorAssociativity {
+fn operator_associativity(op: Operator) -> OperatorAssociativity {
     match op {
-        "[]" | "()" => OperatorAssociativity::None,
-        "." => OperatorAssociativity::Left,
-        "!" => OperatorAssociativity::Right,
-        "+" | "-" | "*" | "/" | "%" => OperatorAssociativity::Left,
-        "<=" | ">=" | "==" => OperatorAssociativity::Left,
-        "<" | ">" => OperatorAssociativity::Left,
-        "&&" | "||" => OperatorAssociativity::Left,
-        _ => OperatorAssociativity::None,
+        Operator::Member => OperatorAssociativity::Left,
+        Operator::Access => OperatorAssociativity::None,
+        Operator::Not => OperatorAssociativity::Right,
+        Operator::Plus
+        | Operator::Minus
+        | Operator::Multiply
+        | Operator::Divide
+        | Operator::Mod => OperatorAssociativity::Left,
+        Operator::Gte | Operator::Lte | Operator::Eq => OperatorAssociativity::Left,
+        Operator::Gt | Operator::Lt => OperatorAssociativity::Left,
+        Operator::Or | Operator::And => OperatorAssociativity::Left,
     }
 }
 
 /// Gives a number of operator precedence to the specified operator name.
 ///
 /// Lesser operator precedence number means the operators has greater precedence.
-fn operator_precedence(op: &str) -> i32 {
+fn operator_precedence(op: Operator) -> i32 {
     match op {
-        "[]" | "()" => 1, // 後置演算子
-        "." => 1,         // メンバアクセス演算子。まだない。
-        "!" => 2,         // ないけど
-        "*" | "/" | "%" => 3,
-        "+" | "-" => 4,
-        "<=" | ">=" | "==" => 5,
-        "<" | ">" => 5,
-        "&&" => 6,
-        "||" => 7,
-        _ => -1, // そんな演算子はないエラー
+        Operator::Access => 1,
+        Operator::Member => 1, // メンバアクセス演算子。まだない。
+        Operator::Not => 2,    // ないけど
+        Operator::Multiply | Operator::Divide | Operator::Mod => 3,
+        Operator::Plus | Operator::Minus => 4,
+        Operator::Gte | Operator::Lte | Operator::Eq => 5,
+        Operator::Gt | Operator::Lt => 5,
+        Operator::And => 6,
+        Operator::Or => 7,
     }
 }
 
@@ -189,13 +191,13 @@ struct ParseExpState<'a> {
     /// A number of nesting of parse_exp_1. It's for debugging.
     nest: u32,
     /// A rest of inputs
-    input: &'a [Token<'a>],
+    input: &'a [Token],
     /// An output queue.
     output: Vec<Exp>,
     /// An operator stack.
-    stack: Vec<Token<'a>>,
+    stack: Vec<Token>,
     /// A token for the previous parse_exp_1.
-    prev_token: Option<Token<'a>>,
+    prev_token: Option<Token>,
 }
 
 /// Terminates shunting-yard algorithm with ParseExpState.
@@ -208,7 +210,7 @@ fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'
         match state.stack.pop() {
             Some(Token::Op(op)) => {
                 if let (Some(exp2), Some(exp1)) = (state.output.pop(), state.output.pop()) {
-                    let exp = Exp::BinaryOp(op.to_string(), Box::new(exp1), Box::new(exp2));
+                    let exp = Exp::BinaryOp(op.clone(), Box::new(exp1), Box::new(exp2));
                     state.output.push(exp);
                 } else {
                     return Err(Err::Error(ParseError::new(
@@ -271,7 +273,7 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
                     state.input = rest;
                     state.prev_token = Some(Token::CloseBracket);
                     let exp = Exp::PostOp(
-                        "[]".to_string(),
+                        Box::new(Operator::Access),
                         Box::new(Symbol(name.to_string())),
                         Box::new(exp),
                     );
@@ -311,12 +313,14 @@ fn parse_exp_1_subexp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> 
 /// Distinguishes wheather the token `op` is unary operators.
 ///
 /// For example, unary `-` token, to determine it is unary `-` it must be know previous token.
-fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
+fn is_unary(op: Operator, prev_token: Option<Token>) -> bool {
     match op {
-        "-" => match prev_token {
+        Operator::Minus => match prev_token {
             Some(Token::Float(_)) => false,
-            Some(Token::Op("-")) => false,
-            Some(Token::Op(_)) => true,
+            Some(Token::Op(op)) => match *op {
+                Operator::Minus => false,
+                _ => true,
+            },
             Some(Token::OpenParen) => true,
             Some(_) => false,
             None => true,
@@ -330,16 +334,16 @@ fn is_unary<'a>(op: &str, prev_token: Option<Token<'a>>) -> bool {
 /// This algorithm is based on shunting-yard algorithm but few points are modified.
 /// That point is immediately creating AST.
 fn parse_exp_1_op<'a>(
-    op1: &str,
-    token: Option<Token<'a>>,
+    op1: &Operator,
+    token: Option<Token>,
     state: &mut ParseExpState<'a>,
 ) -> ParseExp1Result<'a> {
-    if is_unary(op1, state.prev_token.clone()) {
+    if is_unary(op1.clone(), state.prev_token.clone()) {
         if let Err(err) = parse_exp_1(state) {
             return Err(err);
         } else {
             if let Some(exp) = state.output.pop() {
-                let exp = Exp::UnaryOp(op1.to_string(), Box::new(exp));
+                let exp = Exp::UnaryOp(Box::new(op1.clone()), Box::new(exp));
                 state.output.push(exp);
             } else {
                 return Err(Err::Error(ParseError::new(
@@ -353,14 +357,14 @@ fn parse_exp_1_op<'a>(
             if let Some(Token::Op(op2)) = state.stack.last() {
                 // if op2 has high precedence (lesser number) than op1, immediately pop op2 and construct Exp::BinaryOp
                 // so op1 has lesser precedence number (it means low precedence), immediately breaks this loop
-                match operator_associativity(op1) {
+                match operator_associativity(op1.clone()) {
                     OperatorAssociativity::Left => {
-                        if operator_precedence(op1) < operator_precedence(op2) {
+                        if operator_precedence(op1.clone()) < operator_precedence(*op2.clone()) {
                             break;
                         }
                     }
                     OperatorAssociativity::Right => {
-                        if operator_precedence(op1) <= operator_precedence(op2) {
+                        if operator_precedence(op1.clone()) <= operator_precedence(*op2.clone()) {
                             break;
                         }
                     }
@@ -372,11 +376,9 @@ fn parse_exp_1_op<'a>(
                 if let (Some(Token::Op(op)), Some(exp2), Some(exp1)) =
                     (state.stack.pop(), state.output.pop(), state.output.pop())
                 {
-                    state.output.push(Exp::BinaryOp(
-                        op.to_string(),
-                        Box::new(exp1),
-                        Box::new(exp2),
-                    ));
+                    state
+                        .output
+                        .push(Exp::BinaryOp(op, Box::new(exp1), Box::new(exp2)));
                 } else {
                     return Err(Err::Error(ParseError::new(
                         &state.input[..],
@@ -469,7 +471,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
 ///
 /// The expression parser meets end-of-expression things, e.g. closing delimiter,
 /// the parser exits its process by this function.
-fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
+fn end_of_exp(state: &mut ParseExpState) -> bool {
     if state.input.len() == 0 {
         return true;
     }
@@ -491,7 +493,7 @@ fn end_of_exp<'a>(state: &mut ParseExpState<'a>) -> bool {
 /// so here uses shunting-yard algorithm.
 /// This loops parsing towards end of expressions, then collecting rest operators and its operands,
 /// then returns the result.
-fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
+fn parse_expression(t: &[Token]) -> ParseExpResult {
     let mut state = ParseExpState {
         nest: 0,
         input: t,
@@ -524,7 +526,7 @@ fn parse_expression<'a>(t: &'a [Token<'a>]) -> ParseExpResult<'a> {
 ///
 /// The `parse_expression` returns Exp type because of recursive call in parsing expression.
 /// But, entirely, the most parsing functions returns `Option<AST>` so this function wraps it.
-fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_expression_ast(t: &[Token]) -> ParseResult {
     match parse_expression(t) {
         Ok((rest, exp)) => Ok((rest, Some(AST::Exp(Box::new(exp))))),
         Err(err) => Err(err),
@@ -532,7 +534,7 @@ fn parse_expression_ast<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 /// Parses assinment statement.
-fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_assignment(t: &[Token]) -> ParseResult {
     match tuple((
         token_type_of(Token::Identifier("".to_string())),
         token_type_of(Token::Assign),
@@ -556,7 +558,7 @@ fn parse_assignment<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 /// Parses return statement.
-fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_return(t: &[Token]) -> ParseResult {
     match tuple((
         token(Token::Keyword(Box::new(Keyword::Return))),
         parse_expression,
@@ -572,9 +574,7 @@ fn parse_return<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 /// The function argument types might be omitted by each arguments, so the the type specifier's
 /// type is Option<Symbol>.
 /// It is same behaviour with `parse_function_definitions`.
-fn parse_function_args<'a>(
-    t: &'a [Token<'a>],
-) -> IResult<Input<'a>, Vec<Declare>, ParseError<'a, Input<'a>>> {
+fn parse_function_args(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseError<Input>> {
     match delimited(
         token(Token::OpenParen),
         separated_list(
@@ -616,9 +616,7 @@ fn parse_function_args<'a>(
 /// Parses a function body in function definitions.
 ///
 /// Here, empty lines are allowed.
-fn parse_function_body<'a>(
-    t: &'a [Token<'a>],
-) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
+fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input>> {
     // parse function body
     match delimited(
         token(Token::OpenBrace),
@@ -649,7 +647,7 @@ fn parse_function_body<'a>(
 /// The function return type might be omitted, so the the type specifier's
 /// type is Option<Symbol>.
 /// It is same behaviour with `parse_function_args`.
-fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_function_definition(t: &[Token]) -> ParseResult {
     match tuple((
         token(Token::Keyword(Box::new(Keyword::Fn))),
         many0(token(Token::Newline)),
@@ -700,7 +698,7 @@ fn parse_function_definition<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 /// Parses a statement in the toplevel.
-fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
+fn parse_1(t: &[Token]) -> ParseResult {
     alt((
         value(None, token(Token::Newline)),
         parse_function_definition,
@@ -710,7 +708,7 @@ fn parse_1<'a>(t: &'a [Token<'a>]) -> ParseResult<'a> {
 }
 
 /// Parses all toplevel statatements from the input.
-pub fn parse<'a>(t: &'a [Token]) -> IResult<Input<'a>, Vec<AST>, ParseError<'a, Input<'a>>> {
+pub fn parse(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input>> {
     match all_consuming(many0(parse_1))(t) {
         Ok((rest, astvec)) => Ok((
             rest,
@@ -761,7 +759,7 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::UnaryOp(
-                "-".to_string(),
+                Box::new(Operator::Minus),
                 Box::new(Exp::Float(1.0)),
             ))),
             "-1",
@@ -772,7 +770,7 @@ mod test_parse {
     fn test_binary_operators() {
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "+".to_string(),
+                Box::new(Operator::Plus),
                 Box::new(Exp::Float(1.0)),
                 Box::new(Exp::Float(2.0)),
             ))),
@@ -781,7 +779,7 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "-".to_string(),
+                Box::new(Operator::Minus),
                 Box::new(Exp::Float(10.0)),
                 Box::new(Exp::Float(5.0)),
             ))),
@@ -790,8 +788,11 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "-".to_string(),
-                Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(1.0)))),
+                Box::new(Operator::Minus),
+                Box::new(Exp::UnaryOp(
+                    Box::new(Operator::Minus),
+                    Box::new(Exp::Float(1.0)),
+                )),
                 Box::new(Exp::Float(2.0)),
             ))),
             "-1-2",
@@ -799,9 +800,12 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "*".to_string(),
+                Box::new(Operator::Multiply),
                 Box::new(Exp::Float(42.0)),
-                Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(1.0)))),
+                Box::new(Exp::UnaryOp(
+                    Box::new(Operator::Minus),
+                    Box::new(Exp::Float(1.0)),
+                )),
             ))),
             "42*-1",
         );
@@ -811,9 +815,9 @@ mod test_parse {
     fn test_nested_expressions() {
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "*".to_string(),
+                Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )),
@@ -824,9 +828,9 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "-".to_string(),
+                Box::new(Operator::Minus),
                 Box::new(Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )),
@@ -837,10 +841,10 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "+".to_string(),
+                Box::new(Operator::Plus),
                 Box::new(Exp::Float(1.0)),
                 Box::new(Exp::BinaryOp(
-                    "*".to_string(),
+                    Box::new(Operator::Multiply),
                     Box::new(Exp::Float(2.0)),
                     Box::new(Exp::Float(3.0)),
                 )),
@@ -850,11 +854,11 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "+".to_string(),
+                Box::new(Operator::Plus),
                 Box::new(Exp::BinaryOp(
-                    "-".to_string(),
+                    Box::new(Operator::Minus),
                     Box::new(Exp::BinaryOp(
-                        "+".to_string(),
+                        Box::new(Operator::Plus),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::Float(2.0)),
                     )),
@@ -867,14 +871,14 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "*".to_string(),
+                Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )),
                 Box::new(Exp::BinaryOp(
-                    "-".to_string(),
+                    Box::new(Operator::Minus),
                     Box::new(Exp::Float(3.0)),
                     Box::new(Exp::Float(4.0)),
                 )),
@@ -884,13 +888,16 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "*".to_string(),
+                Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
-                    "-".to_string(),
+                    Box::new(Operator::Minus),
                     Box::new(Exp::BinaryOp(
-                        "+".to_string(),
+                        Box::new(Operator::Plus),
                         Box::new(Exp::Float(1.0)),
-                        Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(2.0)))),
+                        Box::new(Exp::UnaryOp(
+                            Box::new(Operator::Minus),
+                            Box::new(Exp::Float(2.0)),
+                        )),
                     )),
                     Box::new(Exp::Float(3.0)),
                 )),
@@ -901,13 +908,16 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "*".to_string(),
+                Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::BinaryOp(
-                        "-".to_string(),
-                        Box::new(Exp::UnaryOp("-".to_string(), Box::new(Exp::Float(2.0)))),
+                        Box::new(Operator::Minus),
+                        Box::new(Exp::UnaryOp(
+                            Box::new(Operator::Minus),
+                            Box::new(Exp::Float(2.0)),
+                        )),
                         Box::new(Exp::Float(3.0)),
                     )),
                 )),
@@ -921,7 +931,7 @@ mod test_parse {
     fn test_array_access() {
         test_parse_1(
             AST::Exp(Box::new(Exp::PostOp(
-                "[]".to_string(),
+                Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::Float(1.0)),
             ))),
@@ -930,7 +940,7 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::PostOp(
-                "[]".to_string(),
+                Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::Variable(Box::new(Symbol("var".to_string())))),
             ))),
@@ -939,13 +949,13 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::PostOp(
-                "[]".to_string(),
+                Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::BinaryOp(
-                    "%".to_string(),
+                    Box::new(Operator::Mod),
                     Box::new(Exp::Variable(Box::new(Symbol("var".to_string())))),
                     Box::new(Exp::BinaryOp(
-                        "-".to_string(),
+                        Box::new(Operator::Minus),
                         Box::new(Exp::Float(10.0)),
                         Box::new(Exp::Float(2.0)),
                     )),
@@ -975,7 +985,7 @@ mod test_parse {
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
-                "+".to_string(),
+                Box::new(Operator::Plus),
                 Box::new(Exp::InvokeFn(
                     Box::new(Symbol("fn1".to_string())),
                     vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
@@ -1025,7 +1035,7 @@ mod test_parse {
             AST::Exp(Box::new(Exp::InvokeFn(
                 Box::new(Symbol("f1".to_string())),
                 vec![Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )],
@@ -1038,12 +1048,12 @@ mod test_parse {
                 Box::new(Symbol("f1".to_string())),
                 vec![
                     Exp::BinaryOp(
-                        "+".to_string(),
+                        Box::new(Operator::Plus),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::Float(2.0)),
                     ),
                     Exp::BinaryOp(
-                        "*".to_string(),
+                        Box::new(Operator::Multiply),
                         Box::new(Exp::Float(3.0)),
                         Box::new(Exp::Float(4.0)),
                     ),
@@ -1128,10 +1138,10 @@ mod test_parse {
                 AST::Assign(
                     Box::new(Symbol("var2".to_string())),
                     Box::new(Exp::BinaryOp(
-                        "+".to_string(),
+                        Box::new(Operator::Plus),
                         Box::new(Exp::Float(4.0)),
                         Box::new(Exp::BinaryOp(
-                            "*".to_string(),
+                            Box::new(Operator::Multiply),
                             Box::new(Exp::Float(5.0)),
                             Box::new(Exp::Float(6.0)),
                         )),
@@ -1148,7 +1158,7 @@ mod test_parse {
                 Box::new(Exp::InvokeFn(
                     Box::new(Symbol("f".to_string())),
                     vec![Exp::BinaryOp(
-                        "+".to_string(),
+                        Box::new(Operator::Plus),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::Float(2.0)),
                     )],
@@ -1257,12 +1267,12 @@ mod test_parse {
                 vec![],
                 None,
                 vec![AST::Return(Box::new(Exp::BinaryOp(
-                    "+".to_string(),
+                    Box::new(Operator::Plus),
                     Box::new(Exp::Float(10.0)),
                     Box::new(Exp::InvokeFn(
                         Box::new(Symbol("f".to_string())),
                         vec![Exp::BinaryOp(
-                            "-".to_string(),
+                            Box::new(Operator::Minus),
                             Box::new(Exp::Float(20.0)),
                             Box::new(Exp::Float(1.0)),
                         )],

@@ -52,11 +52,53 @@ impl Special {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-pub enum Token<'a> {
+pub enum Operator {
+    Plus,
+    Minus,
+    Multiply,
+    Divide,
+    Mod,
+    Eq,
+    Gt,
+    Gte,
+    Lt,
+    Lte,
+    Or,
+    And,
+    Not,
+    Member,
+    Access,
+}
+
+impl Operator {
+    fn from_str(name: &str) -> Option<Operator> {
+        match name {
+            "+" => Some(Operator::Plus),
+            "-" => Some(Operator::Minus),
+            "*" => Some(Operator::Multiply),
+            "/" => Some(Operator::Divide),
+            "%" => Some(Operator::Mod),
+            "==" => Some(Operator::Eq),
+            ">" => Some(Operator::Gt),
+            ">=" => Some(Operator::Gte),
+            "<" => Some(Operator::Lt),
+            "<=" => Some(Operator::Lte),
+            "||" => Some(Operator::Or),
+            "&&" => Some(Operator::And),
+            "!" => Some(Operator::Not),
+            "." => Some(Operator::Member),
+            "[]" => Some(Operator::Access),
+            _ => None,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub enum Token {
     Float(f64),
     Keyword(Box<Keyword>),
     Special(Box<Special>),
-    Op(&'a str),
+    Op(Box<Operator>),
     Identifier(String),
     String(String),
     LineComment(String),
@@ -74,7 +116,7 @@ pub enum Token<'a> {
     Newline,
 }
 
-pub fn token_type_eq<'a>(t1: &Token<'a>, t2: &Token<'a>) -> bool {
+pub fn token_type_eq(t1: &Token, t2: &Token) -> bool {
     match t1 {
         Token::Float(_) => match t2 {
             Token::Float(_) => true,
@@ -249,7 +291,12 @@ fn tokenize_op(s: &str) -> IResult<&str, Token> {
         tag(">"),
         tag("！"),
     ))(s)?;
-    Ok((s, Token::Op(op)))
+    if let Some(op) = Operator::from_str(op) {
+        Ok((s, Token::Op(Box::new(op))))
+    } else {
+        // TODO: it should be original error
+        Err(Err::Error((s, ErrorKind::IsNot)))
+    }
 }
 
 fn tokenize_delimiter(s: &str) -> IResult<&str, Token> {
@@ -426,16 +473,16 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize_op() {
-        test_tokenize_fn(&tokenize_op, Token::Op("+"), "+");
-        test_tokenize_fn(&tokenize_op, Token::Op("-"), "-");
-        test_tokenize_fn(&tokenize_op, Token::Op("*"), "*");
-        test_tokenize_fn(&tokenize_op, Token::Op("/"), "/");
-        test_tokenize_fn(&tokenize_op, Token::Op("%"), "%");
-        test_tokenize_fn(&tokenize_op, Token::Op("<"), "<");
-        test_tokenize_fn(&tokenize_op, Token::Op(">"), ">");
-        test_tokenize_fn(&tokenize_op, Token::Op("<="), "<=");
-        test_tokenize_fn(&tokenize_op, Token::Op(">="), ">=");
-        test_tokenize_fn(&tokenize_op, Token::Op("=="), "==");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Plus)), "+");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Minus)), "-");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Multiply)), "*");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Divide)), "/");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Mod)), "%");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Lt)), "<");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Gt)), ">");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Lte)), "<=");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Gte)), ">=");
+        test_tokenize_fn(&tokenize_op, Token::Op(Box::new(Operator::Eq)), "==");
     }
 
     #[test]
@@ -549,14 +596,21 @@ mod test_tokenize {
 
     #[test]
     fn test_tokenize() {
-        test_tokenize_1(vec![Token::Op("-"), Token::Float(127.0)], "-127");
         test_tokenize_1(
-            vec![Token::Op("-"), Token::Float(127.0), Token::Float(127.0)],
+            vec![Token::Op(Box::new(Operator::Minus)), Token::Float(127.0)],
+            "-127",
+        );
+        test_tokenize_1(
+            vec![
+                Token::Op(Box::new(Operator::Minus)),
+                Token::Float(127.0),
+                Token::Float(127.0),
+            ],
             "-127 127",
         );
         test_tokenize_1(
             vec![
-                Token::Op("-"),
+                Token::Op(Box::new(Operator::Minus)),
                 Token::Float(127.0),
                 Token::Float(127.0),
                 Token::Special(Box::new(Special::Now)),
@@ -568,10 +622,10 @@ mod test_tokenize {
         test_tokenize_1(
             vec![
                 Token::Float(0.5),
-                Token::Op("*"),
+                Token::Op(Box::new(Operator::Multiply)),
                 Token::OpenParen,
                 Token::Float(1.0),
-                Token::Op("+"),
+                Token::Op(Box::new(Operator::Plus)),
                 Token::Float(2.0),
                 Token::CloseParen,
             ],
@@ -581,7 +635,7 @@ mod test_tokenize {
         test_tokenize_1(
             vec![
                 Token::String("abc".to_string()),
-                Token::Op("+"),
+                Token::Op(Box::new(Operator::Plus)),
                 Token::String("123".to_string()),
             ],
             "\"abc\" + \"123\"",
@@ -613,7 +667,7 @@ mod test_tokenize {
             vec![
                 Token::LineComment("abc".to_string()),
                 Token::Identifier("a".to_string()),
-                Token::Op("+"),
+                Token::Op(Box::new(Operator::Plus)),
                 Token::Identifier("b".to_string()),
                 Token::Newline,
                 Token::LineComment("fff".to_string()),
