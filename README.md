@@ -11,7 +11,7 @@ Its goal is adding object defining/creating notation for now.
 - [ ] parse official examples
   - [x] parse [demo.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/demo.mmm)
   - [x] parse [lpf.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/lpf.mmm)
-- [ ] syntactically same code generation
+- [x] syntactically same code generation (maybe)
 - [ ] parse object related syntax?
   - [ ] `def objname {slot1: type1, slot2: type2}`
   - [ ] `objname(slot1_value, slot2_value)`
