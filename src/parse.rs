@@ -1,9 +1,10 @@
-use crate::tokenize::{token_type_eq, Keyword, Operator, Special, Token};
 use nom::branch::alt;
 use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
 use nom::sequence::{delimited, tuple};
 use nom::{Err, IResult};
+
+use crate::tokenize::{token_type_eq, Keyword, Operator, Special, Token};
 
 /// Represents error types while parsing.
 #[derive(Debug)]
