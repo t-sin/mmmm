@@ -116,7 +116,7 @@ fn token_type_of<'a>(token: Token) -> impl Fn(&'a [Token]) -> CombinatorResult<'
 
 #[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's identifier
-pub struct Symbol(String);
+pub struct Symbol(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's expressions.
