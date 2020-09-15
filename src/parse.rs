@@ -620,6 +620,7 @@ fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input
             parse_assignment,
             parse_return,
             value(None, token(Token::Newline)),
+            value(None, token_type_of(Token::LineComment("".to_string()))),
         ))),
         token(Token::CloseBrace),
     )(t)
@@ -694,6 +695,7 @@ fn parse_function_definition(t: &[Token]) -> ParseResult {
 /// Parses a statement in the toplevel.
 fn parse_1(t: &[Token]) -> ParseResult {
     alt((
+        value(None, token_type_of(Token::LineComment("".to_string()))),
         value(None, token(Token::Newline)),
         parse_function_definition,
         parse_assignment,
