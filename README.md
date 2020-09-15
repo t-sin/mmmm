@@ -27,7 +27,7 @@ echo 'fn func(a, b) {return a+b}' | cargo run
 
 ## Author
 
-- t-sin (<shinichi.tanaka45@gmail.com>)
+- Shinichi Tanaka (<shinichi.tanaka45@gmail.com>)
 
 ## License
 
