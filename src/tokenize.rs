@@ -247,7 +247,8 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
         alt((
             space1,
             all_consuming(space0),
-            peek(map(one_of("{}()[]"), |_: char| "")),
+            // TODO: fix delimiters as magic constants
+            peek(map(one_of("{}()[],"), |_: char| "")),
         )),
     ))(s)?;
     if let Some(kw) = Keyword::from_str(name) {
@@ -263,7 +264,8 @@ fn tokenize_special_variable(s: &str) -> IResult<&str, Token> {
         alt((tag("now"), tag("self"))),
         alt((
             space1,
-            peek(map(one_of("{}()[]"), |_: char| "")),
+            // TODO: fix delimiters as magic constants
+            peek(map(one_of("{}()[],"), |_: char| "")),
             all_consuming(space0),
         )),
     ))(s)?;
