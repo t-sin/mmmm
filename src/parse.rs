@@ -1244,6 +1244,45 @@ mod test_parse {
             )],
             "fn func(a: float) {}",
         );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![
+                    Declare::Var(Box::new(Symbol("a".to_string())), None),
+                    Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
+                ],
+                None,
+                vec![],
+            )],
+            "fn func(a, b: void) {}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![
+                    Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
+                    Declare::Var(Box::new(Symbol("b".to_string())), None),
+                ],
+                None,
+                vec![],
+            )],
+            "fn func(a: float, b) {}",
+        );
+
+        test_parse_all(
+            &[AST::Defun(
+                Box::new(Symbol("func".to_string())),
+                vec![
+                    Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
+                    Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
+                ],
+                None,
+                vec![],
+            )],
+            "fn func(a: float, b: void) {}",
+        );
     }
 
     #[test]
