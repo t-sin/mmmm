@@ -34,12 +34,15 @@ fn main() {
     };
     let input = &input;
 
-    match tokenize::tokenize(input) {
-        Ok((_, tokens)) => {
-            println!("parsed: {:?}", tokens);
-            let ast = parse::parse(&tokens);
-            println!("ast: {:?}", ast);
-        }
+    let tokens = match tokenize::tokenize(input) {
+        Ok((_, tokens)) => Some(tokens),
+        err => panic!("tokenize error: {:?}", err),
+    };
+
+    let asts = match parse::parse(&tokens.unwrap()) {
+        Ok((_, asts)) => Some(asts),
         err => panic!("parse error: {:?}", err),
-    }
+    };
+
+    println!("AST = {:?}", asts);
 }
