@@ -159,7 +159,8 @@ fn operator_associativity(op: Operator) -> OperatorAssociativity {
         | Operator::Minus
         | Operator::Multiply
         | Operator::Divide
-        | Operator::Mod => OperatorAssociativity::Left,
+        | Operator::Mod
+        | Operator::Power => OperatorAssociativity::Left,
         Operator::Gte | Operator::Lte | Operator::Eq => OperatorAssociativity::Left,
         Operator::Gt | Operator::Lt => OperatorAssociativity::Left,
         Operator::Or | Operator::And => OperatorAssociativity::Left,
@@ -174,12 +175,13 @@ fn operator_precedence(op: Operator) -> i32 {
         Operator::Access => 1,
         Operator::Member => 1, // メンバアクセス演算子。まだない。
         Operator::Not => 2,    // ないけど
-        Operator::Multiply | Operator::Divide | Operator::Mod => 3,
-        Operator::Plus | Operator::Minus => 4,
-        Operator::Gte | Operator::Lte | Operator::Eq => 5,
-        Operator::Gt | Operator::Lt => 5,
-        Operator::And => 6,
-        Operator::Or => 7,
+        Operator::Power => 3,
+        Operator::Multiply | Operator::Divide | Operator::Mod => 4,
+        Operator::Plus | Operator::Minus => 5,
+        Operator::Gte | Operator::Lte | Operator::Eq => 6,
+        Operator::Gt | Operator::Lt => 6,
+        Operator::And => 7,
+        Operator::Or => 8,
     }
 }
 
