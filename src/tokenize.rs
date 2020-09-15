@@ -91,6 +91,27 @@ impl Operator {
             _ => None,
         }
     }
+
+    pub fn to_string(&self) -> &str {
+        match self {
+            Operator::Plus => "+",
+            Operator::Minus => "-",
+            Operator::Multiply => "*",
+            Operator::Divide => "/",
+            Operator::Mod => "%",
+            Operator::Power => "^",
+            Operator::Eq => "==",
+            Operator::Gt => ">",
+            Operator::Gte => ">=",
+            Operator::Lt => "<",
+            Operator::Lte => "<=",
+            Operator::Or => "||",
+            Operator::And => "&&",
+            Operator::Not => "!",
+            Operator::Member => ".",
+            Operator::Access => "[]",
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone)]
