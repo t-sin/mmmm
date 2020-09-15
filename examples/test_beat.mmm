@@ -1,0 +1,88 @@
+sample_rate = 48000
+pi = 3.141592
+
+// kick
+kick_path = "./kick.wav"
+kick_size = loadwavsize(kick_path)
+kick_wav = loadwav(kick_path)
+kick_pos = 0
+kick_note_on = 0
+
+fn kick() -> float {
+    pos = kick_pos * kick_note_on
+    v = kick_wav[pos]
+    kick_pos = kick_pos + 1
+    return v
+}
+
+fn kick_on() -> void {
+    kick_pos = 0
+    kick_note_on = 1
+}
+
+fn kick_off() -> void {
+    kick_note_on = 0
+}
+
+fn trig_kick(dur) -> void {
+    kick_on()@now
+    kick_off()@(now+kick_size)
+    trig_kick(dur)@(now+dur)
+}
+
+// hihat
+hihat_path = "./hihat.wav"
+hihat_size = loadwavsize(hihat_path)
+hihat_wav = loadwav(hihat_path)
+hihat_pos = 0
+hihat_note_on = 0
+
+fn hihat() -> float {
+    pos = hihat_pos * hihat_note_on
+    v = hihat_wav[pos]
+    hihat_pos = hihat_pos + 1
+    return v
+}
+
+fn hihat_on() -> void {
+    hihat_pos = 0
+    hihat_note_on = 1
+}
+
+fn hihat_off() -> void {
+    hihat_note_on = 0
+}
+
+fn trig_hihat(dur) -> void {
+    hihat_on()@now
+    hihat_off()@(now+hihat_size)
+    trig_hihat(dur)@(now+dur)
+}
+
+// noise
+noise_note_on = 0
+fn noise_on() -> void {
+    noise_note_on = 1
+}
+fn noise_off() -> void {
+    noise_note_on = 0
+}
+
+fn trig_noise(dur) -> void {
+    noise_on()@now
+    noise_off()@(now+10)
+    trig_noise(dur)@(now+dur)
+}
+
+fn dsp(time) -> float {
+    n = 0.5 * (if (noise_note_on) random() else 0)
+    k = 0.7 * (if (kick_note_on) kick() else 0)
+    h = 0.7 * (if (hihat_note_on) hihat() else 0)
+    return n + k + h
+}
+
+trig_noise(sample_rate / 2)@0
+trig_noise(sample_rate / 8)@(sample_rate * 8)
+
+trig_kick(sample_rate / 2)@(sample_rate * 8 * 1.5)
+trig_hihat(sample_rate / 2)@(sample_rate * 8 * 1.5 + sample_rate / 4)
