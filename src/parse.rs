@@ -1210,7 +1210,10 @@ mod test_parse {
             )],
             "fn func() {a=42\nb=84}",
         );
+    }
 
+    #[test]
+    fn test_function_args() {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
