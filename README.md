@@ -7,6 +7,7 @@ Its goal is adding object defining/creating notation for now.
 ## TODO
 
 - [x] parse `./examples/test.mmm`
+- [ ] parse `./examples/test_beat.mmm`
 - [ ] parse official examples
   - [x] parse [demo.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/demo.mmm)
   - [x] parse [lpf.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/lpf.mmm)
