@@ -1,6 +1,7 @@
 extern crate clap;
 extern crate nom;
 
+mod codegen;
 mod parse;
 mod tokenize;
 
@@ -44,5 +45,7 @@ fn main() {
         err => panic!("parse error: {:?}", err),
     };
 
-    println!("AST = {:?}", asts);
+    let code = codegen::generate(&asts.unwrap());
+
+    println!("{}", code);
 }
