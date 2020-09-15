@@ -7,7 +7,9 @@ Its goal is adding object defining/creating notation for now.
 ## TODO
 
 - [x] parse `./examples/test.mmm`
-- [x] parse [demo.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/demo.mmm) in mimium official examples
+- [ ] parse official examples
+  - [x] parse [demo.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/demo.mmm)
+  - [x] parse [lpf.mmm](https://github.com/mimium-org/mimium/blob/dev/examples/lpf.mmm)
 - [ ] syntactically same code generation
 - [ ] parse object related syntax?
   - [ ] `def objname {slot1: type1, slot2: type2}`
