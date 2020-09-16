@@ -3,7 +3,7 @@ wav = loadwav(wavpath)
 wavlen = loadwavsize(wavpath)
 pos = 0
 
-fn dsp()->void {
+fn dsp()->float {
   v = wav[pos]
   pos = (pos + 1) % wavlen
   return v
