@@ -1,5 +1,15 @@
-use crate::parse::{Declare, Exp, AST};
+use crate::parse::{Declare, Exp, InvokeFn, AST};
 use crate::tokenize::{Keyword, Operator, Special};
+
+fn generate_invoke_fn(invoke: &InvokeFn) -> String {
+    let argstr = invoke
+        .1
+        .iter()
+        .map(|e| generate_exp(e))
+        .collect::<Vec<_>>()
+        .join(", ");
+    format!("{}({})", invoke.0.0, argstr)
+}
 
 fn generate_exp(exp: &Exp) -> String {
     match exp {
@@ -10,14 +20,7 @@ fn generate_exp(exp: &Exp) -> String {
             Special::SelfVar => format!("self"),
         },
         Exp::Variable(name) => format!("{}", name.0),
-        Exp::InvokeFn(name, args) => {
-            let argstr = args
-                .iter()
-                .map(|e| generate_exp(e))
-                .collect::<Vec<_>>()
-                .join(", ");
-            format!("{}({})", name.0, argstr)
-        }
+        Exp::InvokeFn(invoke) => generate_invoke_fn(invoke),
         Exp::UnaryOp(op, exp) => match **op {
             Operator::Minus => format!("-{}", generate_exp(exp)),
             _ => panic!("unknown unary operator {:?}", op),

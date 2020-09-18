@@ -14,6 +14,7 @@ pub enum ErrorKind {
     UnexpectedToken(Token),
     UnexpectedEof,
     CannotParseExpression,
+    InvalidInvokeFn,
 }
 
 /// Represents parser errors.
@@ -119,13 +120,17 @@ fn token_type_of<'a>(token: Token) -> impl Fn(&'a [Token]) -> CombinatorResult<'
 pub struct Symbol(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
+/// Represents mmmm's function invokation.
+pub struct InvokeFn(pub Box<Symbol>, pub Vec<Exp>);
+
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's expressions.
 pub enum Exp {
     Float(f64),
     String(String),
     Special(Box<Special>),
     Variable(Box<Symbol>),
-    InvokeFn(Box<Symbol>, Vec<Exp>),
+    InvokeFn(Box<InvokeFn>),
     UnaryOp(Box<Operator>, Box<Exp>),
     BinaryOp(Box<Operator>, Box<Exp>, Box<Exp>),
     PostOp(Box<Operator>, Box<Symbol>, Box<Exp>),
@@ -235,6 +240,25 @@ fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'
     Ok(())
 }
 
+/// Parses function invokation.
+fn parse_invoke_fn<'a>(
+    t: &'a [Token],
+    name: &String,
+) -> IResult<Input<'a>, InvokeFn, ParseError<Input<'a>>> {
+    match delimited(
+        token(Token::OpenParen),
+        separated_list(token(Token::Comma), parse_expression),
+        token(Token::CloseParen),
+    )(t)
+    {
+        Ok((rest, args)) => Ok((rest, InvokeFn(Box::new(Symbol(name.to_string())), args))),
+        _ => Err(Err::Error(ParseError {
+            input: t,
+            kind: ErrorKind::InvalidInvokeFn,
+        })),
+    }
+}
+
 /// Parses identifiers related expressions.
 ///
 /// This function parses three kind of expressions:
@@ -249,16 +273,11 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
     match state.input.iter().nth(0) {
         Some(Token::OpenParen) => {
             // function invokation
-            match delimited(
-                token(Token::OpenParen),
-                separated_list(token(Token::Comma), parse_expression),
-                token(Token::CloseParen),
-            )(state.input)
-            {
-                Ok((rest, args)) => {
+            match parse_invoke_fn(state.input, name) {
+                Ok((rest, invoke_fn)) => {
                     state.input = rest;
                     state.prev_token = Some(Token::CloseParen);
-                    let exp = Exp::InvokeFn(Box::new(Symbol(name.to_string())), args);
+                    let exp = Exp::InvokeFn(Box::new(invoke_fn));
                     state.output.push(exp);
                 }
                 Err(err) => return Err(err),
@@ -967,83 +986,95 @@ mod test_parse {
     #[test]
     fn test_function_call() {
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("fnc".to_string())),
                 vec![Exp::Float(1.0)],
-            ))),
+            ))))),
             "fnc(1)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("fnc".to_string())),
                 vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
-            ))),
+            ))))),
             "fnc(1,2,3)",
         );
 
         test_parse_1(
             AST::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Plus),
-                Box::new(Exp::InvokeFn(
+                Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("fn1".to_string())),
                     vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
-                )),
-                Box::new(Exp::InvokeFn(
+                )))),
+                Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("fn2".to_string())),
                     vec![Exp::Float(1.0)],
-                )),
+                )))),
             ))),
             "fn1(1,2,3) + fn2(1)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("f1".to_string())),
-                vec![Exp::InvokeFn(
+                vec![Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("f2".to_string())),
                     vec![Exp::Float(42.0)],
-                )],
-            ))),
+                )))],
+            ))))),
             "f1(f2(42))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("f1".to_string())),
                 vec![
-                    Exp::InvokeFn(Box::new(Symbol("f2".to_string())), vec![Exp::Float(10.0)]),
-                    Exp::InvokeFn(Box::new(Symbol("f3".to_string())), vec![Exp::Float(20.0)]),
+                    Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f2".to_string())),
+                        vec![Exp::Float(10.0)],
+                    ))),
+                    Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f3".to_string())),
+                        vec![Exp::Float(20.0)],
+                    ))),
                 ],
-            ))),
+            ))))),
             "f1(f2(10), f3(20))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("f1".to_string())),
                 vec![
-                    Exp::InvokeFn(Box::new(Symbol("f2".to_string())), vec![Exp::Float(10.0)]),
-                    Exp::InvokeFn(Box::new(Symbol("f3".to_string())), vec![Exp::Float(20.0)]),
+                    Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f2".to_string())),
+                        vec![Exp::Float(10.0)],
+                    ))),
+                    Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f3".to_string())),
+                        vec![Exp::Float(20.0)],
+                    ))),
                 ],
-            ))),
+            ))))),
             "f1(f2(10), f3(20))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("f1".to_string())),
                 vec![Exp::BinaryOp(
                     Box::new(Operator::Plus),
                     Box::new(Exp::Float(1.0)),
                     Box::new(Exp::Float(2.0)),
                 )],
-            ))),
+            ))))),
             "f1(1+2)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(
+            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                 Box::new(Symbol("f1".to_string())),
                 vec![
                     Exp::BinaryOp(
@@ -1057,7 +1088,7 @@ mod test_parse {
                         Box::new(Exp::Float(4.0)),
                     ),
                 ],
-            ))),
+            ))))),
             "f1(1+2, 3*4)",
         );
     }
@@ -1154,14 +1185,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Assign(
                 Box::new(Symbol("var".to_string())),
-                Box::new(Exp::InvokeFn(
+                Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("f".to_string())),
                     vec![Exp::BinaryOp(
                         Box::new(Operator::Plus),
                         Box::new(Exp::Float(1.0)),
                         Box::new(Exp::Float(2.0)),
                     )],
-                )),
+                )))),
             )],
             "var = f(1+2)",
         );
@@ -1310,14 +1341,14 @@ mod test_parse {
                 vec![AST::Return(Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
                     Box::new(Exp::Float(10.0)),
-                    Box::new(Exp::InvokeFn(
+                    Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                         Box::new(Symbol("f".to_string())),
                         vec![Exp::BinaryOp(
                             Box::new(Operator::Minus),
                             Box::new(Exp::Float(20.0)),
                             Box::new(Exp::Float(1.0)),
                         )],
-                    )),
+                    )))),
                 )))],
             )],
             "fn f1() {return 10+f(20-1)}",
