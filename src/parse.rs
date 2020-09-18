@@ -116,7 +116,7 @@ fn token_type_of<'a>(token: Token) -> impl Fn(&'a [Token]) -> CombinatorResult<'
 }
 
 #[derive(Debug, PartialEq, Clone)]
-/// Represents mmmm's identifier
+/// Represents mmmm's identifier.
 pub struct Symbol(pub String);
 
 #[derive(Debug, PartialEq, Clone)]
@@ -152,6 +152,7 @@ pub enum AST {
     Exp(Box<Exp>),
     Assign(Box<Symbol>, Box<Exp>),
     Return(Box<Exp>),
+    InvokeAt(Box<InvokeFn>, Box<Exp>),
     Defun(Box<Symbol>, Vec<Declare>, Option<Keyword>, Vec<AST>),
 }
 
@@ -241,17 +242,26 @@ fn terminate_parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'
 }
 
 /// Parses function invokation.
-fn parse_invoke_fn<'a>(
-    t: &'a [Token],
-    name: &String,
-) -> IResult<Input<'a>, InvokeFn, ParseError<Input<'a>>> {
-    match delimited(
-        token(Token::OpenParen),
-        separated_list(token(Token::Comma), parse_expression),
-        token(Token::CloseParen),
-    )(t)
+fn parse_invoke_fn<'a>(t: &'a [Token]) -> IResult<Input<'a>, InvokeFn, ParseError<Input<'a>>> {
+    match tuple((
+        token_type_of(Token::Identifier("".to_string())),
+        delimited(
+            token(Token::OpenParen),
+            separated_list(token(Token::Comma), parse_expression),
+            token(Token::CloseParen),
+        ),
+    ))(t)
     {
-        Ok((rest, args)) => Ok((rest, InvokeFn(Box::new(Symbol(name.to_string())), args))),
+        Ok((rest, (name, args))) => {
+            if let Token::Identifier(name) = name {
+                Ok((rest, InvokeFn(Box::new(Symbol(name.clone())), args)))
+            } else {
+                Err(Err::Error(ParseError {
+                    input: t,
+                    kind: ErrorKind::InvalidInvokeFn,
+                }))
+            }
+        }
         _ => Err(Err::Error(ParseError {
             input: t,
             kind: ErrorKind::InvalidInvokeFn,
@@ -270,28 +280,36 @@ fn parse_invoke_fn<'a>(
 /// Three kind of expressions above are proceeded by an identifier, so this function distinguishes by
 /// checking next token in ParseExpState.
 fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
-    match state.input.iter().nth(0) {
+    match state.input.iter().nth(1) {
         Some(Token::OpenParen) => {
             // function invokation
-            match parse_invoke_fn(state.input, name) {
+            match parse_invoke_fn(state.input) {
                 Ok((rest, invoke_fn)) => {
                     state.input = rest;
                     state.prev_token = Some(Token::CloseParen);
                     let exp = Exp::InvokeFn(Box::new(invoke_fn));
                     state.output.push(exp);
                 }
-                Err(err) => return Err(err),
+                Err(err) => {
+                    return Err(Err::Error(ParseError {
+                        input: state.input,
+                        kind: ErrorKind::InvalidInvokeFn,
+                    }))
+                }
             };
         }
         Some(Token::OpenBracket) => {
             // array access
-            match delimited(
-                token(Token::OpenBracket),
-                parse_expression,
-                token(Token::CloseBracket),
-            )(state.input)
+            match tuple((
+                token_type_of(Token::Identifier("".to_string())),
+                delimited(
+                    token(Token::OpenBracket),
+                    parse_expression,
+                    token(Token::CloseBracket),
+                ),
+            ))(state.input)
             {
-                Ok((rest, exp)) => {
+                Ok((rest, (_, exp))) => {
                     state.input = rest;
                     state.prev_token = Some(Token::CloseBracket);
                     let exp = Exp::PostOp(
@@ -305,6 +323,7 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
             }
         }
         _ => {
+            state.input = &state.input[1..];
             // variable
             let exp = Exp::Variable(Box::new(Symbol(name.to_string())));
             state.output.push(exp);
@@ -423,6 +442,7 @@ fn parse_exp_1_op<'a>(
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     let token = state.input.iter().nth(0);
     let input = state.input;
+    let prev_input = state.input;
     if state.input.len() > 0 {
         state.input = &state.input[1..];
     }
@@ -444,7 +464,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             state.output.push(Exp::Special(sp.clone()));
             Ok(())
         }
-        Some(Token::Identifier(name)) => parse_exp_1_identifier(name, state),
+        Some(Token::Identifier(name)) => {
+            state.input = prev_input;
+            parse_exp_1_identifier(name, state)
+        }
         Some(Token::OpenParen) => {
             state.input = input;
             parse_exp_1_subexp(state)
@@ -586,6 +609,16 @@ fn parse_return(t: &[Token]) -> ParseResult {
     }
 }
 
+/// Parses scheduled function invokation.
+fn parse_invoke_at(t: &[Token]) -> ParseResult {
+    match tuple((parse_invoke_fn, token(Token::TimeAt), parse_expression))(t) {
+        Ok((rest, (invoke, _, exp))) => {
+            Ok((rest, Some(AST::InvokeAt(Box::new(invoke), Box::new(exp)))))
+        }
+        Err(err) => Err(err),
+    }
+}
+
 /// Parses function arguments list in function definition.
 ///
 /// The function argument types might be omitted by each arguments, so the the type specifier's
@@ -641,6 +674,7 @@ fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input
             parse_expression_ast,
             parse_assignment,
             parse_return,
+            parse_invoke_at,
             value(None, token(Token::Newline)),
             value(None, token_type_of(Token::LineComment("".to_string()))),
         ))),
@@ -722,6 +756,7 @@ fn parse_1(t: &[Token]) -> ParseResult {
         parse_function_definition,
         parse_assignment,
         parse_expression_ast,
+        parse_invoke_at,
     ))(t)
 }
 

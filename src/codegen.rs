@@ -75,6 +75,9 @@ fn generate_1(ast: &AST, nest: u64) -> String {
         AST::Exp(exp) => generate_exp(exp),
         AST::Assign(name, exp) => format!("{} = {}", name.0, generate_exp(exp)),
         AST::Return(exp) => format!("return {}", generate_exp(exp)),
+        AST::InvokeAt(invoke, exp) => {
+            format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp))
+        }
         AST::Defun(name, declares, rettype, body) => {
             let decstr = generate_declares(declares);
             let retstr = match rettype {
