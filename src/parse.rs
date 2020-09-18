@@ -1414,6 +1414,40 @@ mod test_parse {
     }
 
     #[test]
+    fn test_invoke_function_at() {
+        test_parse_all(
+            &[AST::InvokeAt(
+                Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
+                Box::new(Exp::Float(10.0)),
+            )],
+            "test()@10",
+        );
+
+        test_parse_all(
+            &[AST::InvokeAt(
+                Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
+                Box::new(Exp::BinaryOp(
+                    Box::new(Operator::Plus),
+                    Box::new(Exp::Float(10.0)),
+                    Box::new(Exp::Float(1.0)),
+                )),
+            )],
+            "test()@(10+1)",
+        );
+
+        test_parse_all(
+            &[AST::InvokeAt(
+                Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
+                Box::new(Exp::InvokeFn(Box::new(InvokeFn(
+                    Box::new(Symbol("rand".to_string())),
+                    vec![],
+                )))),
+            )],
+            "test()@(rand())",
+        );
+    }
+
+    #[test]
     fn test_newlines() {
         test_parse_all(
             &[AST::Defun(
