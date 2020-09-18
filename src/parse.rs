@@ -290,7 +290,7 @@ fn parse_exp_1_identifier<'a>(name: &String, state: &mut ParseExpState<'a>) -> P
                     let exp = Exp::InvokeFn(Box::new(invoke_fn));
                     state.output.push(exp);
                 }
-                Err(err) => {
+                Err(_) => {
                     return Err(Err::Error(ParseError {
                         input: state.input,
                         kind: ErrorKind::InvalidInvokeFn,
