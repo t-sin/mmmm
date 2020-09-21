@@ -1,7 +1,7 @@
 use nom::branch::alt;
 use nom::combinator::{all_consuming, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
-use nom::sequence::{delimited, tuple};
+use nom::sequence::{delimited, preceded, tuple};
 use nom::{Err, IResult};
 
 use crate::tokenize::{token_type_eq, Keyword, Operator, Special, Token};
@@ -124,6 +124,14 @@ pub struct Symbol(pub String);
 pub struct InvokeFn(pub Box<Symbol>, pub Vec<Exp>);
 
 #[derive(Debug, PartialEq, Clone)]
+/// Represents mmmm's if expression.
+pub struct If {
+    pub cond: Box<Exp>,
+    pub true_clause: Vec<Exp>,
+    pub false_clause: Option<Vec<Exp>>,
+}
+
+#[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's expressions.
 pub enum Exp {
     Float(f64),
@@ -134,6 +142,7 @@ pub enum Exp {
     UnaryOp(Box<Operator>, Box<Exp>),
     BinaryOp(Box<Operator>, Box<Exp>, Box<Exp>),
     PostOp(Box<Operator>, Box<Symbol>, Box<Exp>),
+    If(Box<If>),
 }
 
 /// Represents variable declaration with type.
@@ -436,7 +445,52 @@ fn parse_exp_1_op<'a>(
     Ok(())
 }
 
-/// Parse a part of expressions.
+/// Parses an if expression.
+fn parse_exp_1_if<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
+    match preceded(
+        token(Token::Keyword(Box::new(Keyword::If))),
+        tuple((
+            delimited(
+                token(Token::OpenParen),
+                parse_expression,
+                token(Token::CloseParen),
+            ),
+            delimited(
+                token(Token::OpenBrace),
+                many0(tuple((parse_expression, opt(token(Token::Newline))))),
+                token(Token::CloseBrace),
+            ),
+            // opt(preceded(
+            //     token(Token::Keyword(Box::new(Keyword::Else))),
+            //     delimited(
+            //         token(Token::OpenBrace),
+            //         many0(parse_expression),
+            //         token(Token::CloseBrace),
+            //     ),
+            // )),
+        )),
+    )(state.input)
+    {
+        Ok((rest, (cond, true_clause))) => {
+            state.input = rest;
+            state.prev_token = Some(Token::CloseBrace);
+            let true_clause = true_clause
+                .iter()
+                .map(|(e, _)| e.clone())
+                .collect::<Vec<_>>();
+            let exp = Exp::If(Box::new(If {
+                cond: Box::new(cond),
+                true_clause: true_clause,
+                false_clause: None,
+            }));
+            state.output.push(exp);
+            Ok(())
+        }
+        Err(err) => Err(err),
+    }
+}
+
+/// Parse a part of expression.
 ///
 /// Parsing expressions is a process that loops this function unless at the end of expressions (see `end_of_exp()`).
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
@@ -456,10 +510,16 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             state.output.push(Exp::String(s.to_string()));
             Ok(())
         }
-        Some(Token::Keyword(_)) => Err(Err::Error(ParseError::new(
-            &state.input[..],
-            ErrorKind::UnexpectedToken(token.unwrap().clone()),
-        ))),
+        Some(Token::Keyword(kw)) => match **kw {
+            Keyword::If => {
+                state.input = prev_input;
+                parse_exp_1_if(state)
+            }
+            _ => Err(Err::Error(ParseError::new(
+                &state.input[..],
+                ErrorKind::UnexpectedToken(token.unwrap().clone()),
+            ))),
+        },
         Some(Token::Special(sp)) => {
             state.output.push(Exp::Special(sp.clone()));
             Ok(())
@@ -517,7 +577,10 @@ fn end_of_exp(state: &mut ParseExpState) -> bool {
     }
 
     match state.input.iter().nth(0).unwrap() {
-        Token::Keyword(_) => true,
+        Token::Keyword(kw) => match **kw {
+            Keyword::If => false,
+            _ => true,
+        },
         Token::Comma => true,
         Token::Newline => true,
         Token::CloseParen => true,
