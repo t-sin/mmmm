@@ -1,5 +1,5 @@
 use nom::branch::alt;
-use nom::combinator::{all_consuming, opt, rest_len, value};
+use nom::combinator::{all_consuming, map, opt, rest_len, value};
 use nom::multi::{many0, separated_list};
 use nom::sequence::{delimited, preceded, tuple};
 use nom::{Err, IResult};
@@ -455,18 +455,24 @@ fn parse_exp_1_if<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
                 parse_expression,
                 token(Token::CloseParen),
             ),
-            delimited(
-                token(Token::OpenBrace),
-                many0(tuple((parse_expression, opt(token(Token::Newline))))),
-                token(Token::CloseBrace),
-            ),
-            opt(preceded(
-                token(Token::Keyword(Box::new(Keyword::Else))),
+            alt((
                 delimited(
                     token(Token::OpenBrace),
                     many0(tuple((parse_expression, opt(token(Token::Newline))))),
                     token(Token::CloseBrace),
                 ),
+                map(parse_expression, |exp| vec![(exp, None)]),
+            )),
+            opt(preceded(
+                token(Token::Keyword(Box::new(Keyword::Else))),
+                alt((
+                    delimited(
+                        token(Token::OpenBrace),
+                        many0(tuple((parse_expression, opt(token(Token::Newline))))),
+                        token(Token::CloseBrace),
+                    ),
+                    map(parse_expression, |exp| vec![(exp, None)]),
+                )),
             )),
         )),
     )(state.input)
