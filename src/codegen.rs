@@ -60,7 +60,7 @@ fn generate_exp(exp: &Exp, nest: u64) -> String {
                 }
                 s
             } else {
-                generate_exp(&ifexp.true_clause[0], nest)
+                format!(" {} ", generate_exp(&ifexp.true_clause[0], nest))
             };
             format!(
                 "if ({}) {{{}}}",
