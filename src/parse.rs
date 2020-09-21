@@ -460,28 +460,32 @@ fn parse_exp_1_if<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
                 many0(tuple((parse_expression, opt(token(Token::Newline))))),
                 token(Token::CloseBrace),
             ),
-            // opt(preceded(
-            //     token(Token::Keyword(Box::new(Keyword::Else))),
-            //     delimited(
-            //         token(Token::OpenBrace),
-            //         many0(parse_expression),
-            //         token(Token::CloseBrace),
-            //     ),
-            // )),
+            opt(preceded(
+                token(Token::Keyword(Box::new(Keyword::Else))),
+                delimited(
+                    token(Token::OpenBrace),
+                    many0(tuple((parse_expression, opt(token(Token::Newline))))),
+                    token(Token::CloseBrace),
+                ),
+            )),
         )),
     )(state.input)
     {
-        Ok((rest, (cond, true_clause))) => {
+        Ok((rest, (cond, true_clause, false_clause))) => {
             state.input = rest;
             state.prev_token = Some(Token::CloseBrace);
             let true_clause = true_clause
                 .iter()
                 .map(|(e, _)| e.clone())
                 .collect::<Vec<_>>();
+            let false_clause = match false_clause {
+                Some(expvec) => Some(expvec.iter().map(|(e, _)| e.clone()).collect::<Vec<_>>()),
+                None => None,
+            };
             let exp = Exp::If(Box::new(If {
                 cond: Box::new(cond),
                 true_clause: true_clause,
-                false_clause: None,
+                false_clause: false_clause,
             }));
             state.output.push(exp);
             Ok(())
