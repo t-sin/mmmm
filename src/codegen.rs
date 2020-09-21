@@ -11,6 +11,25 @@ fn generate_invoke_fn(invoke: &InvokeFn) -> String {
     format!("{}({})", invoke.0.0, argstr)
 }
 
+fn generate_if_body(list: &[Exp], nest: u64) -> String {
+    if list.len() > 1 {
+        let mut s = String::new();
+        s.push_str("\n");
+
+        for exp in list.iter() {
+            for _ in 0..nest + 1 {
+                s.push_str("  ");
+            }
+
+            s.push_str(&generate_exp(exp, nest + 1));
+            s.push_str("\n");
+        }
+        s
+    } else {
+        format!(" {} ", generate_exp(&list[0], nest))
+    }
+}
+
 fn generate_exp(exp: &Exp, nest: u64) -> String {
     match exp {
         Exp::Float(f) => format!("{}", f),
@@ -46,26 +65,17 @@ fn generate_exp(exp: &Exp, nest: u64) -> String {
             _ => panic!("unknown postfix operator {:?}", op),
         },
         Exp::If(ifexp) => {
-            let true_clause = if ifexp.true_clause.len() > 1 {
-                let mut s = String::new();
-                s.push_str("\n");
-
-                for exp in ifexp.true_clause.iter() {
-                    for _ in 0..nest + 1 {
-                        s.push_str("  ");
-                    }
-
-                    s.push_str(&generate_exp(exp, nest + 1));
-                    s.push_str("\n");
-                }
-                s
+            let true_clause = generate_if_body(&ifexp.true_clause, nest);
+            let false_clause = if let Some(exp) = &ifexp.false_clause {
+                format!(" else {{{}}}", generate_if_body(&exp, nest))
             } else {
-                format!(" {} ", generate_exp(&ifexp.true_clause[0], nest))
+                "".to_string()
             };
             format!(
-                "if ({}) {{{}}}",
+                "if ({}) {{{}}}{}",
                 generate_exp(&ifexp.cond, nest),
-                true_clause
+                true_clause,
+                false_clause,
             )
         }
     }
