@@ -108,9 +108,29 @@ fn generate_1(ast: &AST, nest: u64) -> String {
         AST::Exp(exp) => generate_exp(exp, nest),
         AST::Assign(name, exp) => format!("{} = {}", name.0, generate_exp(exp, nest)),
         AST::Return(exp) => format!("return {}", generate_exp(exp, nest)),
-        AST::InvokeAt(invoke, exp) => {
-            format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest))
-        }
+        AST::InvokeAt(invoke, exp) => match **exp {
+            Exp::Float(_) => format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest)),
+            Exp::Special(_) => {
+                format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest))
+            }
+            Exp::Variable(_) => {
+                format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest))
+            }
+            Exp::InvokeFn(_) => {
+                format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest))
+            }
+            Exp::BinaryOp(_, _, _) => format!(
+                "{}@({})",
+                generate_invoke_fn(invoke),
+                generate_exp(exp, nest)
+            ),
+            Exp::PostOp(_, _, _) => format!(
+                "{}@({})",
+                generate_invoke_fn(invoke),
+                generate_exp(exp, nest)
+            ),
+            _ => panic!("unexpected expression: {:?}", exp),
+        },
         AST::Defun(name, declares, rettype, body) => {
             let decstr = generate_declares(declares);
             let retstr = match rettype {
