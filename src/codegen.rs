@@ -25,8 +25,10 @@ fn generate_if_body(list: &[Exp], nest: u64) -> String {
             s.push_str("\n");
         }
         s
+    } else if list.len() == 1 {
+        format!("{}", generate_exp(&list[0], nest))
     } else {
-        format!(" {} ", generate_exp(&list[0], nest))
+        "".to_string()
     }
 }
 
@@ -67,12 +69,12 @@ fn generate_exp(exp: &Exp, nest: u64) -> String {
         Exp::If(ifexp) => {
             let true_clause = generate_if_body(&ifexp.true_clause, nest);
             let false_clause = if let Some(exp) = &ifexp.false_clause {
-                format!(" else {{{}}}", generate_if_body(&exp, nest))
+                format!("{}", generate_if_body(&exp, nest))
             } else {
-                "".to_string()
+                "{{}}".to_string()
             };
             format!(
-                "if ({}) {{{}}}{}",
+                "if ({}) {} else {}",
                 generate_exp(&ifexp.cond, nest),
                 true_clause,
                 false_clause,
