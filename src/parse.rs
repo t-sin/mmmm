@@ -1532,4 +1532,39 @@ mod test_parse {
             "fn loop()\n->void {}",
         );
     }
+
+    #[test]
+    fn test_if() {
+        test_parse_all(
+            &[AST::Exp(Box::new(Exp::If(Box::new(If {
+                cond: Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
+                true_clause: vec![Exp::Variable(Box::new(Symbol("b".to_string())))],
+                false_clause: Some(vec![Exp::Variable(Box::new(Symbol("c".to_string())))]),
+            }))))],
+            "if (a) b else c",
+        );
+
+        test_parse_all(
+            &[AST::Exp(Box::new(Exp::If(Box::new(If {
+                cond: Box::new(Exp::BinaryOp(
+                    Box::new(Operator::Mod),
+                    Box::new(Exp::BinaryOp(
+                        Box::new(Operator::Plus),
+                        Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
+                        Box::new(Exp::Variable(Box::new(Symbol("b".to_string())))),
+                    )),
+                    Box::new(Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("c".to_string())),
+                        Vec::new(),
+                    )))),
+                )),
+                true_clause: vec![Exp::Float(0.0)],
+                false_clause: Some(vec![Exp::InvokeFn(Box::new(InvokeFn(
+                    Box::new(Symbol("f".to_string())),
+                    Vec::new(),
+                )))]),
+            }))))],
+            "if ((a + b) % c()) {0} else {f()}",
+        );
+    }
 }
