@@ -125,6 +125,7 @@ pub enum Token {
     LineComment(String),
     Comma,
     Colon,
+    Bar,
     OpenParen,
     CloseParen,
     OpenBracket,
@@ -173,6 +174,10 @@ pub fn token_type_eq(t1: &Token, t2: &Token) -> bool {
         },
         Token::Colon => match t2 {
             Token::Colon => true,
+            _ => false,
+        },
+        Token::Bar => match t2 {
+            Token::Bar => true,
             _ => false,
         },
         Token::OpenParen => match t2 {
@@ -361,6 +366,7 @@ fn tokenize_parens(s: &str) -> IResult<&str, Token> {
         char(']'),
         char('{'),
         char('}'),
+        char('|'),
     ))(s)?
     {
         (s, '(') => (s, Token::OpenParen),
@@ -369,6 +375,7 @@ fn tokenize_parens(s: &str) -> IResult<&str, Token> {
         (s, ']') => (s, Token::CloseBracket),
         (s, '{') => (s, Token::OpenBrace),
         (s, '}') => (s, Token::CloseBrace),
+        (s, '|') => (s, Token::Bar),
         (s, _) => return Err(Err::Error((s, ErrorKind::Char))),
     };
     Ok((s, token))

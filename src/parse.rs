@@ -538,6 +538,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             state.input = prev_input;
             parse_exp_1_identifier(name, state)
         }
+        Some(Token::Bar) => Err(Err::Error(ParseError::new(
+            &state.input[..],
+            ErrorKind::UnexpectedToken(token.unwrap().clone()),
+        ))),
         Some(Token::OpenParen) => {
             state.input = input;
             parse_exp_1_subexp(state)
