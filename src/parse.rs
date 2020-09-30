@@ -559,15 +559,18 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     let result = match token {
         Some(Token::Float(f)) => {
             state.output.push(Exp::Float(*f));
+            state.prev_token = Some(token.unwrap().clone());
             Ok(())
         }
         Some(Token::String(s)) => {
             state.output.push(Exp::String(s.to_string()));
+            state.prev_token = Some(token.unwrap().clone());
             Ok(())
         }
         Some(Token::Keyword(kw)) => match **kw {
             Keyword::If => {
                 state.input = prev_input;
+                state.prev_token = Some(token.unwrap().clone());
                 parse_exp_1_if(state)
             }
             _ => Err(Err::Error(ParseError::new(
@@ -576,6 +579,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             ))),
         },
         Some(Token::Special(sp)) => {
+            state.prev_token = Some(token.unwrap().clone());
             state.output.push(Exp::Special(sp.clone()));
             Ok(())
         }
@@ -615,12 +619,6 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
         | Some(Token::CloseBracket)
         | Some(Token::CloseBrace)
         | None => terminate_parse_exp_1(state),
-    };
-
-    state.prev_token = if let Some(token) = token {
-        Some(token.clone())
-    } else {
-        None
     };
 
     result
@@ -1117,6 +1115,22 @@ mod test_parse {
                 Box::new(Exp::Float(4.0)),
             ))))),
             "(1+(-2-3))*4",
+        );
+    }
+
+    #[test]
+    fn test_unary_operators() {
+        test_parse_1(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
+                Box::new(Operator::Minus),
+                Box::new(Exp::BinaryOp(
+                    Box::new(Operator::Plus),
+                    Box::new(Exp::Float(1.0)),
+                    Box::new(Exp::Float(2.0)),
+                )),
+                Box::new(Exp::Float(3.0)),
+            ))))),
+            "(1+2)-3",
         );
     }
 
