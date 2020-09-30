@@ -585,6 +585,7 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
         }
         Some(Token::Identifier(name)) => {
             state.input = prev_input;
+            state.prev_token = Some(token.unwrap().clone());
             parse_exp_1_identifier(name, state)
         }
         Some(Token::Bar) => {
@@ -1131,6 +1132,19 @@ mod test_parse {
                 Box::new(Exp::Float(3.0)),
             ))))),
             "(1+2)-3",
+        );
+
+        test_parse_1(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
+                Box::new(Operator::Plus),
+                Box::new(Exp::BinaryOp(
+                    Box::new(Operator::Minus),
+                    Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
+                    Box::new(Exp::Float(1.0)),
+                )),
+                Box::new(Exp::Float(2.0)),
+            ))))),
+            "(a-1)+2",
         );
     }
 
