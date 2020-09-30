@@ -67,6 +67,7 @@ pub enum Operator {
     Not,
     Member,
     Access,
+    Pipe,
 }
 
 impl Operator {
@@ -88,6 +89,7 @@ impl Operator {
             "!" => Some(Operator::Not),
             "." => Some(Operator::Member),
             "[]" => Some(Operator::Access),
+            "|>" => Some(Operator::Pipe),
             _ => None,
         }
     }
@@ -110,6 +112,7 @@ impl Operator {
             Operator::Not => "!",
             Operator::Member => ".",
             Operator::Access => "[]",
+            Operator::Pipe => "|>",
         }
     }
 }
@@ -319,6 +322,7 @@ fn tokenize_op(s: &str) -> IResult<&str, Token> {
         tag("<"),
         tag(">"),
         tag("！"),
+        tag("|>"),
     ))(s)?;
     if let Some(op) = Operator::from_str(op) {
         Ok((s, Token::Op(Box::new(op))))

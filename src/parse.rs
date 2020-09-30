@@ -191,6 +191,7 @@ fn operator_associativity(op: Operator) -> OperatorAssociativity {
     match op {
         Operator::Member => OperatorAssociativity::Left,
         Operator::Access => OperatorAssociativity::None,
+        Operator::Pipe => OperatorAssociativity::Left,
         Operator::Not => OperatorAssociativity::Right,
         Operator::Plus
         | Operator::Minus
@@ -211,7 +212,8 @@ fn operator_precedence(op: Operator) -> i32 {
     match op {
         Operator::Access => 1,
         Operator::Member => 1, // メンバアクセス演算子。まだない。
-        Operator::Not => 2,    // ないけど
+        Operator::Pipe => 1,
+        Operator::Not => 2, // ないけど
         Operator::Power => 3,
         Operator::Multiply | Operator::Divide | Operator::Mod => 4,
         Operator::Plus | Operator::Minus => 5,
