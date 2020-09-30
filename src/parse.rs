@@ -59,6 +59,8 @@ type CombinatorResult<'a> = IResult<Input<'a>, &'a Token, ParseError<Input<'a>>>
 type ParseExp1Result<'a> = Result<(), Err<ParseError<Input<'a>>>>;
 /// a return value type of expression parser
 type ParseExpResult<'a> = IResult<Input<'a>, Exp, ParseError<Input<'a>>>;
+/// a retrun value type of statement parser
+type ParseStmtResult<'a> = IResult<Input<'a>, Option<Statement>, ParseError<Input<'a>>>;
 /// a return value type of parser
 type ParseResult<'a> = IResult<Input<'a>, Option<AST>, ParseError<Input<'a>>>;
 
@@ -154,15 +156,25 @@ pub enum Declare {
 }
 
 #[derive(Debug, PartialEq, Clone)]
-/// Represents mmmm's abstruct syntax tree.
-///
-/// Note: Now can parse only expressions.
-pub enum AST {
+/// Represents statements; semantic parts of program.
+pub enum Statement {
     Exp(Box<Exp>),
     Assign(Box<Symbol>, Box<Exp>),
     Return(Box<Exp>),
     InvokeAt(Box<InvokeFn>, Box<Exp>),
-    Defun(Box<Symbol>, Vec<Declare>, Option<Keyword>, Vec<AST>),
+}
+
+/// Represents block.
+type Block = Vec<Statement>;
+
+#[derive(Debug, PartialEq, Clone)]
+/// Represents mmmm's abstruct syntax tree.
+///
+/// Note: Now can parse only expressions.
+pub enum AST {
+    Statement(Box<Statement>),
+    Block(Block),
+    Defun(Box<Symbol>, Vec<Declare>, Option<Keyword>, Block),
 }
 
 /// Gives associativity to the specified operator name.
@@ -639,29 +651,29 @@ fn parse_expression(t: &[Token]) -> ParseExpResult {
     }
 }
 
-/// Parses an expressions as AST.
+/// Parses an expressions as a statement.
 ///
 /// The `parse_expression` returns Exp type because of recursive call in parsing expression.
 /// But, entirely, the most parsing functions returns `Option<AST>` so this function wraps it.
-fn parse_expression_ast(t: &[Token]) -> ParseResult {
+fn parse_expression_stmt(t: &[Token]) -> ParseStmtResult {
     match parse_expression(t) {
-        Ok((rest, exp)) => Ok((rest, Some(AST::Exp(Box::new(exp))))),
+        Ok((rest, exp)) => Ok((rest, Some(Statement::Exp(Box::new(exp))))),
         Err(err) => Err(err),
     }
 }
 
 /// Parses assinment statement.
-fn parse_assignment(t: &[Token]) -> ParseResult {
+fn parse_assignment(t: &[Token]) -> ParseStmtResult {
     match tuple((
         token_type_of(Token::Identifier("".to_string())),
         token_type_of(Token::Assign),
-        parse_expression_ast,
+        parse_expression_stmt,
     ))(t)
     {
-        Ok((rest, (Token::Identifier(name), _, ref ast))) => {
-            if let Some(AST::Exp(exp)) = ast {
-                let ast = AST::Assign(Box::new(Symbol(name.to_string())), (*exp).clone());
-                Ok((rest, Some(ast)))
+        Ok((rest, (Token::Identifier(name), _, ref stmt))) => {
+            if let Some(Statement::Exp(exp)) = stmt {
+                let stmt = Statement::Assign(Box::new(Symbol(name.to_string())), exp.clone());
+                Ok((rest, Some(stmt)))
             } else {
                 Err(Err::Error(ParseError::new(rest, ErrorKind::UnexpectedEof)))
             }
@@ -675,23 +687,39 @@ fn parse_assignment(t: &[Token]) -> ParseResult {
 }
 
 /// Parses return statement.
-fn parse_return(t: &[Token]) -> ParseResult {
+fn parse_return(t: &[Token]) -> ParseStmtResult {
     match tuple((
         token(Token::Keyword(Box::new(Keyword::Return))),
         parse_expression,
     ))(t)
     {
-        Ok((rest, (_, exp))) => Ok((rest, Some(AST::Return(Box::new(exp))))),
+        Ok((rest, (_, exp))) => Ok((rest, Some(Statement::Return(Box::new(exp))))),
         Err(err) => Err(err),
     }
 }
 
 /// Parses scheduled function invokation.
-fn parse_invoke_at(t: &[Token]) -> ParseResult {
+fn parse_invoke_at(t: &[Token]) -> ParseStmtResult {
     match tuple((parse_invoke_fn, token(Token::TimeAt), parse_expression))(t) {
-        Ok((rest, (invoke, _, exp))) => {
-            Ok((rest, Some(AST::InvokeAt(Box::new(invoke), Box::new(exp)))))
-        }
+        Ok((rest, (invoke, _, exp))) => Ok((
+            rest,
+            Some(Statement::InvokeAt(Box::new(invoke), Box::new(exp))),
+        )),
+        Err(err) => Err(err),
+    }
+}
+
+/// Parses a statement.
+fn parse_statement(t: &[Token]) -> ParseResult {
+    match alt((
+        parse_expression_stmt,
+        parse_assignment,
+        parse_return,
+        parse_invoke_at,
+    ))(t)
+    {
+        Ok((rest, Some(stmt))) => Ok((rest, Some(AST::Statement(Box::new(stmt))))),
+        Ok((rest, None)) => Ok((rest, None)),
         Err(err) => Err(err),
     }
 }
@@ -740,15 +768,16 @@ fn parse_function_args(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseError<I
     }
 }
 
-/// Parses a function body in function definitions.
+/// Parses a block (list of statements).
 ///
-/// Here, empty lines are allowed.
-fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input>> {
+/// Blocks appear like at function body, if clauses, or as an expression.
+/// Empty lines are allowed.
+fn parse_block(t: &[Token]) -> IResult<Input, Block, ParseError<Input>> {
     // parse function body
     match delimited(
         token(Token::OpenBrace),
         many0(alt((
-            parse_expression_ast,
+            parse_expression_stmt,
             parse_assignment,
             parse_return,
             parse_invoke_at,
@@ -758,9 +787,9 @@ fn parse_function_body(t: &[Token]) -> IResult<Input, Vec<AST>, ParseError<Input
         token(Token::CloseBrace),
     )(t)
     {
-        Ok((rest, ast_vec)) => Ok((
+        Ok((rest, stmt_vec)) => Ok((
             rest,
-            ast_vec
+            stmt_vec
                 .into_iter()
                 .filter(|o| if let None = o { false } else { true })
                 .map(|o| o.unwrap())
@@ -792,10 +821,10 @@ fn parse_function_definition(t: &[Token]) -> ParseResult {
             )),
         ))),
         many0(token(Token::Newline)),
-        parse_function_body,
+        parse_block,
     ))(t)
     {
-        Ok((rest, (_, _, fn_name, _, args, _, fn_type, _, ast_vec))) => {
+        Ok((rest, (_, _, fn_name, _, args, _, fn_type, _, stmt_vec))) => {
             Ok((
                 rest,
                 Some(AST::Defun(
@@ -817,7 +846,7 @@ fn parse_function_definition(t: &[Token]) -> ParseResult {
                         None
                     },
                     // function body
-                    ast_vec,
+                    stmt_vec,
                 )),
             ))
         }
@@ -830,10 +859,9 @@ fn parse_1(t: &[Token]) -> ParseResult {
     alt((
         value(None, token_type_of(Token::LineComment("".to_string()))),
         value(None, token(Token::Newline)),
+        map(parse_block, |b| Some(AST::Block(b))),
+        parse_statement,
         parse_function_definition,
-        parse_assignment,
-        parse_expression_ast,
-        parse_invoke_at,
     ))(t)
 }
 
