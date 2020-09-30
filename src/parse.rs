@@ -1389,9 +1389,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func() {}",
         );
@@ -1399,12 +1401,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![],
-                None,
-                vec![Statement::Assign(
-                    Box::new(Symbol("a".to_string())),
-                    Box::new(Exp::Float(42.0)),
-                )],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: None,
+                    body: vec![Statement::Assign(
+                        Box::new(Symbol("a".to_string())),
+                        Box::new(Exp::Float(42.0)),
+                    )],
+                }),
             )],
             "fn func() {a=42}",
         );
@@ -1412,18 +1416,20 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![],
-                None,
-                vec![
-                    Statement::Assign(
-                        Box::new(Symbol("a".to_string())),
-                        Box::new(Exp::Float(42.0)),
-                    ),
-                    Statement::Assign(
-                        Box::new(Symbol("b".to_string())),
-                        Box::new(Exp::Float(84.0)),
-                    ),
-                ],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: None,
+                    body: vec![
+                        Statement::Assign(
+                            Box::new(Symbol("a".to_string())),
+                            Box::new(Exp::Float(42.0)),
+                        ),
+                        Statement::Assign(
+                            Box::new(Symbol("b".to_string())),
+                            Box::new(Exp::Float(84.0)),
+                        ),
+                    ],
+                }),
             )],
             "fn func() {a=42\nb=84}",
         );
@@ -1434,9 +1440,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![Declare::Var(Box::new(Symbol("a".to_string())), None)],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![Declare::Var(Box::new(Symbol("a".to_string())), None)],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a) {}",
         );
@@ -1444,12 +1452,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![
-                    Declare::Var(Box::new(Symbol("a".to_string())), None),
-                    Declare::Var(Box::new(Symbol("b".to_string())), None),
-                ],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![
+                        Declare::Var(Box::new(Symbol("a".to_string())), None),
+                        Declare::Var(Box::new(Symbol("b".to_string())), None),
+                    ],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a, b) {}",
         );
@@ -1457,12 +1467,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![Declare::Var(
-                    Box::new(Symbol("a".to_string())),
-                    Some(Keyword::Float),
-                )],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![Declare::Var(
+                        Box::new(Symbol("a".to_string())),
+                        Some(Keyword::Float),
+                    )],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a: float) {}",
         );
@@ -1470,12 +1482,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![
-                    Declare::Var(Box::new(Symbol("a".to_string())), None),
-                    Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
-                ],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![
+                        Declare::Var(Box::new(Symbol("a".to_string())), None),
+                        Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
+                    ],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a, b: void) {}",
         );
@@ -1483,12 +1497,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![
-                    Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
-                    Declare::Var(Box::new(Symbol("b".to_string())), None),
-                ],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![
+                        Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
+                        Declare::Var(Box::new(Symbol("b".to_string())), None),
+                    ],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a: float, b) {}",
         );
@@ -1496,12 +1512,14 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![
-                    Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
-                    Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
-                ],
-                None,
-                vec![],
+                Box::new(Function {
+                    args: vec![
+                        Declare::Var(Box::new(Symbol("a".to_string())), Some(Keyword::Float)),
+                        Declare::Var(Box::new(Symbol("b".to_string())), Some(Keyword::Void)),
+                    ],
+                    ret_type: None,
+                    body: vec![],
+                }),
             )],
             "fn func(a: float, b: void) {}",
         );
@@ -1512,9 +1530,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("func".to_string())),
-                vec![],
-                None,
-                vec![Statement::Return(Box::new(Exp::Float(0.0)))],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: None,
+                    body: vec![Statement::Return(Box::new(Exp::Float(0.0)))],
+                }),
             )],
             "fn func() {return 0}",
         );
@@ -1522,20 +1542,22 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("f1".to_string())),
-                vec![],
-                None,
-                vec![Statement::Return(Box::new(Exp::BinaryOp(
-                    Box::new(Operator::Plus),
-                    Box::new(Exp::Float(10.0)),
-                    Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("f".to_string())),
-                        vec![Exp::BinaryOp(
-                            Box::new(Operator::Minus),
-                            Box::new(Exp::Float(20.0)),
-                            Box::new(Exp::Float(1.0)),
-                        )],
-                    )))),
-                )))],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: None,
+                    body: vec![Statement::Return(Box::new(Exp::BinaryOp(
+                        Box::new(Operator::Plus),
+                        Box::new(Exp::Float(10.0)),
+                        Box::new(Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("f".to_string())),
+                            vec![Exp::BinaryOp(
+                                Box::new(Operator::Minus),
+                                Box::new(Exp::Float(20.0)),
+                                Box::new(Exp::Float(1.0)),
+                            )],
+                        )))),
+                    )))],
+                }),
             )],
             "fn f1() {return 10+f(20-1)}",
         );
@@ -1546,9 +1568,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
-                vec![],
-                Some(Keyword::Void),
-                vec![],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: Some(Keyword::Void),
+                    body: vec![],
+                }),
             )],
             "fn loop()->void {}",
         );
@@ -1556,9 +1580,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
-                vec![],
-                Some(Keyword::Void),
-                vec![],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: Some(Keyword::Void),
+                    body: vec![],
+                }),
             )],
             "fn loop()->void{}",
         );
@@ -1603,9 +1629,11 @@ mod test_parse {
         test_parse_all(
             &[AST::Defun(
                 Box::new(Symbol("loop".to_string())),
-                vec![],
-                Some(Keyword::Void),
-                vec![],
+                Box::new(Function {
+                    args: vec![],
+                    ret_type: Some(Keyword::Void),
+                    body: vec![],
+                }),
             )],
             "fn loop()\n->void {}",
         );
