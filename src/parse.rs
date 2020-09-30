@@ -523,7 +523,6 @@ fn parse_exp_1_if<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
 
 /// Parses a lambda expressions.
 fn parse_lambda_exp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
-    println!("{:?}", state);
     match tuple((
         delimited(token(Token::Bar), parse_function_arglist, token(Token::Bar)),
         parse_block,
