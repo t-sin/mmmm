@@ -276,7 +276,7 @@ fn tokenize_keyword(s: &str) -> IResult<&str, Token> {
             space1,
             all_consuming(space0),
             // TODO: fix delimiters as magic constants
-            peek(map(one_of("{}()[],"), |_: char| "")),
+            peek(map(one_of("{}()[],|"), |_: char| "")),
         )),
     ))(s)?;
     if let Some(kw) = Keyword::from_str(name) {
