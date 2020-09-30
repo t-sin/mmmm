@@ -1,4 +1,4 @@
-use crate::parse::{Declare, Exp, InvokeFn, AST};
+use crate::parse::{Declare, Exp, InvokeFn, Statement, AST};
 use crate::tokenize::{Keyword, Operator, Special};
 
 fn generate_invoke_fn(invoke: &InvokeFn) -> String {
@@ -8,7 +8,7 @@ fn generate_invoke_fn(invoke: &InvokeFn) -> String {
         .map(|e| generate_exp(e, 0))
         .collect::<Vec<_>>()
         .join(", ");
-    format!("{}({})", invoke.0.0, argstr)
+    format!("{}({})", (invoke.0).0, argstr)
 }
 
 fn generate_if_body(list: &[Exp], nest: u64) -> String {
@@ -100,17 +100,17 @@ fn generate_declares(declares: &Vec<Declare>) -> String {
     decs.join(", ")
 }
 
-fn generate_1(ast: &AST, nest: u64) -> String {
+fn generate_statement(ast: &Statement, nest: u64) -> String {
     let mut indent = String::new();
     for _ in 0..nest {
         indent.push_str("  ");
     }
 
     let body = match ast {
-        AST::Exp(exp) => generate_exp(exp, nest),
-        AST::Assign(name, exp) => format!("{} = {}", name.0, generate_exp(exp, nest)),
-        AST::Return(exp) => format!("return {}", generate_exp(exp, nest)),
-        AST::InvokeAt(invoke, exp) => match **exp {
+        Statement::Exp(exp) => generate_exp(exp, nest),
+        Statement::Assign(name, exp) => format!("{} = {}", name.0, generate_exp(exp, nest)),
+        Statement::Return(exp) => format!("return {}", generate_exp(exp, nest)),
+        Statement::InvokeAt(invoke, exp) => match **exp {
             Exp::Float(_) => format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest)),
             Exp::Special(_) => {
                 format!("{}@{}", generate_invoke_fn(invoke), generate_exp(exp, nest))
@@ -133,6 +133,22 @@ fn generate_1(ast: &AST, nest: u64) -> String {
             ),
             _ => panic!("unexpected expression: {:?}", exp),
         },
+    };
+
+    format!("{}{}\n", indent, body)
+}
+
+pub fn generate_1(ast: &AST, nest: u64) -> String {
+    match ast {
+        AST::Statement(stmt) => generate_statement(stmt, nest),
+        AST::Block(block) => {
+            let mut s = String::new();
+            for stmt in block.iter() {
+                s.push_str(&generate_statement(stmt, nest));
+                s.push('\n');
+            }
+            s
+        }
         AST::Defun(name, declares, rettype, body) => {
             let decstr = generate_declares(declares);
             let retstr = match rettype {
@@ -143,14 +159,12 @@ fn generate_1(ast: &AST, nest: u64) -> String {
             };
             let bodystr = body
                 .iter()
-                .map(|a| generate_1(a, nest + 1))
+                .map(|s| generate_statement(s, nest + 1))
                 .collect::<Vec<_>>()
                 .join("");
-            format!("fn {}({}) {} {{\n{}}}", name.0, decstr, retstr, bodystr)
+            format!("fn {}({}) {} {{\n{}}}\n", name.0, decstr, retstr, bodystr)
         }
-    };
-
-    format!("{}{}\n", indent, body)
+    }
 }
 
 pub fn generate(asts: &Vec<AST>) -> String {
