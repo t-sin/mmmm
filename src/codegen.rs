@@ -1,4 +1,4 @@
-use crate::parse::{Declare, Exp, InvokeFn, Statement, AST};
+use crate::parse::{Block, Declare, Exp, InvokeFn, Statement, AST};
 use crate::tokenize::{Keyword, Operator, Special};
 
 fn generate_invoke_fn(invoke: &InvokeFn) -> String {
@@ -32,6 +32,32 @@ fn generate_if_body(list: &[Exp], nest: u64) -> String {
     }
 }
 
+fn generate_fn_args(declares: &Vec<Declare>) -> String {
+    let mut decs = Vec::new();
+    for dec in declares.iter() {
+        let s = match dec {
+            Declare::Var(name, Some(kw)) => match kw {
+                Keyword::Float => format!("{}: float", name.0),
+                Keyword::Void => format!("{}: void", name.0),
+                kw => panic!("unknown type name {:?}", kw),
+            },
+            Declare::Var(name, None) => format!("{}", name.0),
+        };
+        decs.push(s);
+    }
+
+    decs.join(", ")
+}
+
+fn generate_fn_body(body: &Block, nest: u64) -> String {
+    let bodystr = body
+        .iter()
+        .map(|s| generate_statement(s, nest + 1))
+        .collect::<Vec<_>>()
+        .join("");
+    format!("{{\n{}}}", bodystr)
+}
+
 fn generate_exp(exp: &Exp, nest: u64) -> String {
     match exp {
         Exp::Float(f) => format!("{}", f),
@@ -41,6 +67,11 @@ fn generate_exp(exp: &Exp, nest: u64) -> String {
             Special::SelfVar => format!("self"),
         },
         Exp::Variable(name) => format!("{}", name.0),
+        Exp::Fn(f) => format!(
+            "|{}| {}",
+            generate_fn_args(&f.args),
+            generate_fn_body(&f.body, nest)
+        ),
         Exp::InvokeFn(invoke) => generate_invoke_fn(invoke),
         Exp::UnaryOp(op, exp) => match **op {
             Operator::Minus => format!("-{}", generate_exp(exp, nest)),
@@ -81,23 +112,6 @@ fn generate_exp(exp: &Exp, nest: u64) -> String {
             )
         }
     }
-}
-
-fn generate_declares(declares: &Vec<Declare>) -> String {
-    let mut decs = Vec::new();
-    for dec in declares.iter() {
-        let s = match dec {
-            Declare::Var(name, Some(kw)) => match kw {
-                Keyword::Float => format!("{}: float", name.0),
-                Keyword::Void => format!("{}: void", name.0),
-                kw => panic!("unknown type name {:?}", kw),
-            },
-            Declare::Var(name, None) => format!("{}", name.0),
-        };
-        decs.push(s);
-    }
-
-    decs.join(", ")
 }
 
 fn generate_statement(ast: &Statement, nest: u64) -> String {
@@ -149,20 +163,16 @@ pub fn generate_1(ast: &AST, nest: u64) -> String {
             }
             s
         }
-        AST::Defun(name, declares, rettype, body) => {
-            let decstr = generate_declares(declares);
-            let retstr = match rettype {
+        AST::Defun(name, f) => {
+            let decstr = generate_fn_args(&f.args);
+            let retstr = match &f.ret_type {
                 Some(Keyword::Float) => format!("-> float"),
                 Some(Keyword::Void) => format!("-> void"),
                 Some(kw) => panic!("unknown type name {:?}", kw),
                 _ => format!(""),
             };
-            let bodystr = body
-                .iter()
-                .map(|s| generate_statement(s, nest + 1))
-                .collect::<Vec<_>>()
-                .join("");
-            format!("fn {}({}) {} {{\n{}}}\n", name.0, decstr, retstr, bodystr)
+            let bodystr = generate_fn_body(&f.body, nest);
+            format!("fn {}({}) {} {}\n", name.0, decstr, retstr, bodystr)
         }
     }
 }
