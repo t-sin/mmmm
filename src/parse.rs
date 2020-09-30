@@ -133,6 +133,22 @@ pub struct If {
     pub false_clause: Option<Vec<Exp>>,
 }
 
+/// Represents variable declaration with type.
+///
+/// The type may be None when omitted by user.
+#[derive(Debug, PartialEq, Clone)]
+pub enum Declare {
+    Var(Box<Symbol>, Option<Keyword>),
+}
+
+/// Represents mmmm's function objects.
+#[derive(Debug, PartialEq, Clone)]
+pub struct Function {
+    pub args: Vec<Declare>,
+    pub ret_type: Option<Keyword>,
+    pub body: Block,
+}
+
 #[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's expressions.
 pub enum Exp {
@@ -140,19 +156,12 @@ pub enum Exp {
     String(String),
     Special(Box<Special>),
     Variable(Box<Symbol>),
+    Fn(Box<Function>),
     InvokeFn(Box<InvokeFn>),
     UnaryOp(Box<Operator>, Box<Exp>),
     BinaryOp(Box<Operator>, Box<Exp>, Box<Exp>),
     PostOp(Box<Operator>, Box<Symbol>, Box<Exp>),
     If(Box<If>),
-}
-
-/// Represents variable declaration with type.
-///
-/// The type may be None when omitted by user.
-#[derive(Debug, PartialEq, Clone)]
-pub enum Declare {
-    Var(Box<Symbol>, Option<Keyword>),
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -165,7 +174,7 @@ pub enum Statement {
 }
 
 /// Represents block.
-type Block = Vec<Statement>;
+pub type Block = Vec<Statement>;
 
 #[derive(Debug, PartialEq, Clone)]
 /// Represents mmmm's abstruct syntax tree.
@@ -174,7 +183,7 @@ type Block = Vec<Statement>;
 pub enum AST {
     Statement(Box<Statement>),
     Block(Block),
-    Defun(Box<Symbol>, Vec<Declare>, Option<Keyword>, Block),
+    Defun(Box<Symbol>, Box<Function>),
 }
 
 /// Gives associativity to the specified operator name.
@@ -512,7 +521,30 @@ fn parse_exp_1_if<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
     }
 }
 
-/// Parse a part of expression.
+/// Parses a lambda expressions.
+fn parse_lambda_exp<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
+    println!("{:?}", state);
+    match tuple((
+        delimited(token(Token::Bar), parse_function_arglist, token(Token::Bar)),
+        parse_block,
+    ))(state.input)
+    {
+        Ok((rest, (args, block))) => {
+            let exp = Exp::Fn(Box::new(Function {
+                args: args,
+                ret_type: None,
+                body: block,
+            }));
+            state.input = rest;
+            state.prev_token = Some(Token::CloseBrace);
+            state.output.push(exp);
+            Ok(())
+        }
+        Err(err) => Err(err),
+    }
+}
+
+/// Parses a part of expression.
 ///
 /// Parsing expressions is a process that loops this function unless at the end of expressions (see `end_of_exp()`).
 fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
@@ -550,10 +582,10 @@ fn parse_exp_1<'a>(state: &mut ParseExpState<'a>) -> ParseExp1Result<'a> {
             state.input = prev_input;
             parse_exp_1_identifier(name, state)
         }
-        Some(Token::Bar) => Err(Err::Error(ParseError::new(
-            &state.input[..],
-            ErrorKind::UnexpectedToken(token.unwrap().clone()),
-        ))),
+        Some(Token::Bar) => {
+            state.input = prev_input;
+            parse_lambda_exp(state)
+        }
         Some(Token::OpenParen) => {
             state.input = input;
             parse_exp_1_subexp(state)
@@ -729,30 +761,26 @@ fn parse_statement(t: &[Token]) -> ParseResult {
 /// The function argument types might be omitted by each arguments, so the the type specifier's
 /// type is Option<Symbol>.
 /// It is same behaviour with `parse_function_definitions`.
-fn parse_function_args(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseError<Input>> {
-    match delimited(
-        token(Token::OpenParen),
-        separated_list(
-            token(Token::Comma),
-            tuple((
-                token_type_of(Token::Identifier("".to_string())),
-                // function return type
-                opt(tuple((
-                    token(Token::Colon),
-                    // type names
-                    alt((
-                        token(Token::Keyword(Box::new(Keyword::Void))),
-                        token(Token::Keyword(Box::new(Keyword::Float))),
-                    )),
-                ))),
-            )),
-        ),
-        token(Token::CloseParen),
+fn parse_function_arglist(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseError<Input>> {
+    match separated_list(
+        token(Token::Comma),
+        tuple((
+            token_type_of(Token::Identifier("".to_string())),
+            // function return type
+            opt(tuple((
+                token(Token::Colon),
+                // type names
+                alt((
+                    token(Token::Keyword(Box::new(Keyword::Void))),
+                    token(Token::Keyword(Box::new(Keyword::Float))),
+                )),
+            ))),
+        )),
     )(t)
     {
-        Ok((rest, args)) => Ok((
-            rest,
-            args.into_iter()
+        Ok((rest, args)) => {
+            let args = args
+                .into_iter()
                 .map(|t| match t {
                     (Token::Identifier(name), Some((_, Token::Keyword(kw)))) => {
                         Declare::Var(Box::new(Symbol(name.to_string())), Some(*kw.clone()))
@@ -762,8 +790,9 @@ fn parse_function_args(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseError<I
                     }
                     _ => panic!("unreached here because of matching Token::Identifier"),
                 })
-                .collect(),
-        )),
+                .collect();
+            Ok((rest, args))
+        }
         Err(err) => Err(err),
     }
 }
@@ -803,14 +832,18 @@ fn parse_block(t: &[Token]) -> IResult<Input, Block, ParseError<Input>> {
 ///
 /// The function return type might be omitted, so the the type specifier's
 /// type is Option<Symbol>.
-/// It is same behaviour with `parse_function_args`.
+/// It is same behaviour with `parse_function_arglist`.
 fn parse_function_definition(t: &[Token]) -> ParseResult {
     match tuple((
         token(Token::Keyword(Box::new(Keyword::Fn))),
         many0(token(Token::Newline)),
         token_type_of(Token::Identifier("".to_string())),
         many0(token(Token::Newline)),
-        parse_function_args,
+        delimited(
+            token(Token::OpenParen),
+            parse_function_arglist,
+            token(Token::CloseParen),
+        ),
         many0(token(Token::Newline)),
         // parse function return type
         opt(tuple((
@@ -837,16 +870,15 @@ fn parse_function_definition(t: &[Token]) -> ParseResult {
                             ErrorKind::UnexpectedToken(fn_name.clone()),
                         )));
                     },
-                    // function args
-                    args,
-                    // function return type
-                    if let Some((_, Token::Keyword(type_name))) = fn_type {
-                        Some(*type_name.clone())
-                    } else {
-                        None
-                    },
-                    // function body
-                    stmt_vec,
+                    Box::new(Function {
+                        args: args,
+                        ret_type: if let Some((_, Token::Keyword(type_name))) = fn_type {
+                            Some(*type_name.clone())
+                        } else {
+                            None
+                        },
+                        body: stmt_vec,
+                    }),
                 )),
             ))
         }
