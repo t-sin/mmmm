@@ -913,13 +913,16 @@ mod test_parse {
 
     #[test]
     fn test_single_term() {
-        test_parse_1(AST::Exp(Box::new(Exp::Float(0.0))), "0.0");
+        test_parse_1(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::Float(0.0))))),
+            "0.0",
+        );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::UnaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::UnaryOp(
                 Box::new(Operator::Minus),
                 Box::new(Exp::Float(1.0)),
-            ))),
+            ))))),
             "-1",
         );
     }
@@ -927,44 +930,44 @@ mod test_parse {
     #[test]
     fn test_binary_operators() {
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Plus),
                 Box::new(Exp::Float(1.0)),
                 Box::new(Exp::Float(2.0)),
-            ))),
+            ))))),
             "1+2",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Minus),
                 Box::new(Exp::Float(10.0)),
                 Box::new(Exp::Float(5.0)),
-            ))),
+            ))))),
             "10-5",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Minus),
                 Box::new(Exp::UnaryOp(
                     Box::new(Operator::Minus),
                     Box::new(Exp::Float(1.0)),
                 )),
                 Box::new(Exp::Float(2.0)),
-            ))),
+            ))))),
             "-1-2",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Multiply),
                 Box::new(Exp::Float(42.0)),
                 Box::new(Exp::UnaryOp(
                     Box::new(Operator::Minus),
                     Box::new(Exp::Float(1.0)),
                 )),
-            ))),
+            ))))),
             "42*-1",
         );
     }
@@ -972,7 +975,7 @@ mod test_parse {
     #[test]
     fn test_nested_expressions() {
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
@@ -980,12 +983,12 @@ mod test_parse {
                     Box::new(Exp::Float(2.0)),
                 )),
                 Box::new(Exp::Float(3.0)),
-            ))),
+            ))))),
             "(1+2)*3",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Minus),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
@@ -993,12 +996,12 @@ mod test_parse {
                     Box::new(Exp::Float(2.0)),
                 )),
                 Box::new(Exp::Float(3.0)),
-            ))),
+            ))))),
             "1+2-3", // (1+2)-3
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Plus),
                 Box::new(Exp::Float(1.0)),
                 Box::new(Exp::BinaryOp(
@@ -1006,12 +1009,12 @@ mod test_parse {
                     Box::new(Exp::Float(2.0)),
                     Box::new(Exp::Float(3.0)),
                 )),
-            ))),
+            ))))),
             "1+2*3", // 1+(2*3)
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Plus),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Minus),
@@ -1023,12 +1026,12 @@ mod test_parse {
                     Box::new(Exp::Float(3.0)),
                 )),
                 Box::new(Exp::Float(4.0)),
-            ))),
+            ))))),
             "1+2-3+4", // ((1+2)-3)+4
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
@@ -1040,12 +1043,12 @@ mod test_parse {
                     Box::new(Exp::Float(3.0)),
                     Box::new(Exp::Float(4.0)),
                 )),
-            ))),
+            ))))),
             "(1+2)*(3-4)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Minus),
@@ -1060,12 +1063,12 @@ mod test_parse {
                     Box::new(Exp::Float(3.0)),
                 )),
                 Box::new(Exp::Float(4.0)),
-            ))),
+            ))))),
             "(1+-2-3)*4",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Multiply),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
@@ -1080,7 +1083,7 @@ mod test_parse {
                     )),
                 )),
                 Box::new(Exp::Float(4.0)),
-            ))),
+            ))))),
             "(1+(-2-3))*4",
         );
     }
@@ -1088,25 +1091,25 @@ mod test_parse {
     #[test]
     fn test_array_access() {
         test_parse_1(
-            AST::Exp(Box::new(Exp::PostOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::PostOp(
                 Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::Float(1.0)),
-            ))),
+            ))))),
             "a[1]",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::PostOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::PostOp(
                 Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::Variable(Box::new(Symbol("var".to_string())))),
-            ))),
+            ))))),
             "a[var]",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::PostOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::PostOp(
                 Box::new(Operator::Access),
                 Box::new(Symbol("a".to_string())),
                 Box::new(Exp::BinaryOp(
@@ -1118,7 +1121,7 @@ mod test_parse {
                         Box::new(Exp::Float(2.0)),
                     )),
                 )),
-            ))),
+            ))))),
             "a[var%(10-2)]",
         );
     }
@@ -1126,23 +1129,24 @@ mod test_parse {
     #[test]
     fn test_function_call() {
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("fnc".to_string())),
-                vec![Exp::Float(1.0)],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(Box::new(Symbol("fnc".to_string())), vec![Exp::Float(1.0)]),
+            )))))),
             "fnc(1)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("fnc".to_string())),
-                vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("fnc".to_string())),
+                    vec![Exp::Float(1.0), Exp::Float(2.0), Exp::Float(3.0)],
+                ),
+            )))))),
             "fnc(1,2,3)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::BinaryOp(
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::BinaryOp(
                 Box::new(Operator::Plus),
                 Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("fn1".to_string())),
@@ -1152,83 +1156,93 @@ mod test_parse {
                     Box::new(Symbol("fn2".to_string())),
                     vec![Exp::Float(1.0)],
                 )))),
-            ))),
+            ))))),
             "fn1(1,2,3) + fn2(1)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("f1".to_string())),
-                vec![Exp::InvokeFn(Box::new(InvokeFn(
-                    Box::new(Symbol("f2".to_string())),
-                    vec![Exp::Float(42.0)],
-                )))],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("f1".to_string())),
+                    vec![Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f2".to_string())),
+                        vec![Exp::Float(42.0)],
+                    )))],
+                ),
+            )))))),
             "f1(f2(42))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("f1".to_string())),
-                vec![
-                    Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("f2".to_string())),
-                        vec![Exp::Float(10.0)],
-                    ))),
-                    Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("f3".to_string())),
-                        vec![Exp::Float(20.0)],
-                    ))),
-                ],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("f1".to_string())),
+                    vec![
+                        Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("f2".to_string())),
+                            vec![Exp::Float(10.0)],
+                        ))),
+                        Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("f3".to_string())),
+                            vec![Exp::Float(20.0)],
+                        ))),
+                    ],
+                ),
+            )))))),
             "f1(f2(10), f3(20))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("f1".to_string())),
-                vec![
-                    Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("f2".to_string())),
-                        vec![Exp::Float(10.0)],
-                    ))),
-                    Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("f3".to_string())),
-                        vec![Exp::Float(20.0)],
-                    ))),
-                ],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("f1".to_string())),
+                    vec![
+                        Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("f2".to_string())),
+                            vec![Exp::Float(10.0)],
+                        ))),
+                        Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("f3".to_string())),
+                            vec![Exp::Float(20.0)],
+                        ))),
+                    ],
+                ),
+            )))))),
             "f1(f2(10), f3(20))",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("f1".to_string())),
-                vec![Exp::BinaryOp(
-                    Box::new(Operator::Plus),
-                    Box::new(Exp::Float(1.0)),
-                    Box::new(Exp::Float(2.0)),
-                )],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("f1".to_string())),
+                    vec![Exp::BinaryOp(
+                        Box::new(Operator::Plus),
+                        Box::new(Exp::Float(1.0)),
+                        Box::new(Exp::Float(2.0)),
+                    )],
+                ),
+            )))))),
             "f1(1+2)",
         );
 
         test_parse_1(
-            AST::Exp(Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                Box::new(Symbol("f1".to_string())),
-                vec![
-                    Exp::BinaryOp(
-                        Box::new(Operator::Plus),
-                        Box::new(Exp::Float(1.0)),
-                        Box::new(Exp::Float(2.0)),
-                    ),
-                    Exp::BinaryOp(
-                        Box::new(Operator::Multiply),
-                        Box::new(Exp::Float(3.0)),
-                        Box::new(Exp::Float(4.0)),
-                    ),
-                ],
-            ))))),
+            AST::Statement(Box::new(Statement::Exp(Box::new(Exp::InvokeFn(Box::new(
+                InvokeFn(
+                    Box::new(Symbol("f1".to_string())),
+                    vec![
+                        Exp::BinaryOp(
+                            Box::new(Operator::Plus),
+                            Box::new(Exp::Float(1.0)),
+                            Box::new(Exp::Float(2.0)),
+                        ),
+                        Exp::BinaryOp(
+                            Box::new(Operator::Multiply),
+                            Box::new(Exp::Float(3.0)),
+                            Box::new(Exp::Float(4.0)),
+                        ),
+                    ],
+                ),
+            )))))),
             "f1(1+2, 3*4)",
         );
     }
@@ -1277,23 +1291,23 @@ mod test_parse {
     #[test]
     fn test_assignment() {
         test_parse_all(
-            &[AST::Assign(
+            &[AST::Statement(Box::new(Statement::Assign(
                 Box::new(Symbol("var".to_string())),
                 Box::new(Exp::Float(123.0)),
-            )],
+            )))],
             "var = 123",
         );
 
         test_parse_all(
             &[
-                AST::Assign(
+                AST::Statement(Box::new(Statement::Assign(
                     Box::new(Symbol("var".to_string())),
                     Box::new(Exp::Float(123.0)),
-                ),
-                AST::Assign(
+                ))),
+                AST::Statement(Box::new(Statement::Assign(
                     Box::new(Symbol("var2".to_string())),
                     Box::new(Exp::Float(456.0)),
-                ),
+                ))),
             ],
             "var = 123
              var2 = 456",
@@ -1301,11 +1315,11 @@ mod test_parse {
 
         test_parse_all(
             &[
-                AST::Assign(
+                AST::Statement(Box::new(Statement::Assign(
                     Box::new(Symbol("var".to_string())),
                     Box::new(Exp::Float(123.0)),
-                ),
-                AST::Assign(
+                ))),
+                AST::Statement(Box::new(Statement::Assign(
                     Box::new(Symbol("var2".to_string())),
                     Box::new(Exp::BinaryOp(
                         Box::new(Operator::Plus),
@@ -1316,14 +1330,14 @@ mod test_parse {
                             Box::new(Exp::Float(6.0)),
                         )),
                     )),
-                ),
+                ))),
             ],
             "var = 123
              var2 = 4+5*6",
         );
 
         test_parse_all(
-            &[AST::Assign(
+            &[AST::Statement(Box::new(Statement::Assign(
                 Box::new(Symbol("var".to_string())),
                 Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("f".to_string())),
@@ -1333,7 +1347,7 @@ mod test_parse {
                         Box::new(Exp::Float(2.0)),
                     )],
                 )))),
-            )],
+            )))],
             "var = f(1+2)",
         );
     }
@@ -1355,7 +1369,7 @@ mod test_parse {
                 Box::new(Symbol("func".to_string())),
                 vec![],
                 None,
-                vec![AST::Assign(
+                vec![Statement::Assign(
                     Box::new(Symbol("a".to_string())),
                     Box::new(Exp::Float(42.0)),
                 )],
@@ -1369,11 +1383,11 @@ mod test_parse {
                 vec![],
                 None,
                 vec![
-                    AST::Assign(
+                    Statement::Assign(
                         Box::new(Symbol("a".to_string())),
                         Box::new(Exp::Float(42.0)),
                     ),
-                    AST::Assign(
+                    Statement::Assign(
                         Box::new(Symbol("b".to_string())),
                         Box::new(Exp::Float(84.0)),
                     ),
@@ -1468,7 +1482,7 @@ mod test_parse {
                 Box::new(Symbol("func".to_string())),
                 vec![],
                 None,
-                vec![AST::Return(Box::new(Exp::Float(0.0)))],
+                vec![Statement::Return(Box::new(Exp::Float(0.0)))],
             )],
             "fn func() {return 0}",
         );
@@ -1478,7 +1492,7 @@ mod test_parse {
                 Box::new(Symbol("f1".to_string())),
                 vec![],
                 None,
-                vec![AST::Return(Box::new(Exp::BinaryOp(
+                vec![Statement::Return(Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
                     Box::new(Exp::Float(10.0)),
                     Box::new(Exp::InvokeFn(Box::new(InvokeFn(
@@ -1521,33 +1535,33 @@ mod test_parse {
     #[test]
     fn test_invoke_function_at() {
         test_parse_all(
-            &[AST::InvokeAt(
+            &[AST::Statement(Box::new(Statement::InvokeAt(
                 Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
                 Box::new(Exp::Float(10.0)),
-            )],
+            )))],
             "test()@10",
         );
 
         test_parse_all(
-            &[AST::InvokeAt(
+            &[AST::Statement(Box::new(Statement::InvokeAt(
                 Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
                 Box::new(Exp::BinaryOp(
                     Box::new(Operator::Plus),
                     Box::new(Exp::Float(10.0)),
                     Box::new(Exp::Float(1.0)),
                 )),
-            )],
+            )))],
             "test()@(10+1)",
         );
 
         test_parse_all(
-            &[AST::InvokeAt(
+            &[AST::Statement(Box::new(Statement::InvokeAt(
                 Box::new(InvokeFn(Box::new(Symbol("test".to_string())), vec![])),
                 Box::new(Exp::InvokeFn(Box::new(InvokeFn(
                     Box::new(Symbol("rand".to_string())),
                     vec![],
                 )))),
-            )],
+            )))],
             "test()@(rand())",
         );
     }
@@ -1568,34 +1582,38 @@ mod test_parse {
     #[test]
     fn test_if() {
         test_parse_all(
-            &[AST::Exp(Box::new(Exp::If(Box::new(If {
-                cond: Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
-                true_clause: vec![Exp::Variable(Box::new(Symbol("b".to_string())))],
-                false_clause: Some(vec![Exp::Variable(Box::new(Symbol("c".to_string())))]),
-            }))))],
+            &[AST::Statement(Box::new(Statement::Exp(Box::new(Exp::If(
+                Box::new(If {
+                    cond: Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
+                    true_clause: vec![Exp::Variable(Box::new(Symbol("b".to_string())))],
+                    false_clause: Some(vec![Exp::Variable(Box::new(Symbol("c".to_string())))]),
+                }),
+            )))))],
             "if (a) b else c",
         );
 
         test_parse_all(
-            &[AST::Exp(Box::new(Exp::If(Box::new(If {
-                cond: Box::new(Exp::BinaryOp(
-                    Box::new(Operator::Mod),
-                    Box::new(Exp::BinaryOp(
-                        Box::new(Operator::Plus),
-                        Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
-                        Box::new(Exp::Variable(Box::new(Symbol("b".to_string())))),
+            &[AST::Statement(Box::new(Statement::Exp(Box::new(Exp::If(
+                Box::new(If {
+                    cond: Box::new(Exp::BinaryOp(
+                        Box::new(Operator::Mod),
+                        Box::new(Exp::BinaryOp(
+                            Box::new(Operator::Plus),
+                            Box::new(Exp::Variable(Box::new(Symbol("a".to_string())))),
+                            Box::new(Exp::Variable(Box::new(Symbol("b".to_string())))),
+                        )),
+                        Box::new(Exp::InvokeFn(Box::new(InvokeFn(
+                            Box::new(Symbol("c".to_string())),
+                            Vec::new(),
+                        )))),
                     )),
-                    Box::new(Exp::InvokeFn(Box::new(InvokeFn(
-                        Box::new(Symbol("c".to_string())),
+                    true_clause: vec![Exp::Float(0.0)],
+                    false_clause: Some(vec![Exp::InvokeFn(Box::new(InvokeFn(
+                        Box::new(Symbol("f".to_string())),
                         Vec::new(),
-                    )))),
-                )),
-                true_clause: vec![Exp::Float(0.0)],
-                false_clause: Some(vec![Exp::InvokeFn(Box::new(InvokeFn(
-                    Box::new(Symbol("f".to_string())),
-                    Vec::new(),
-                )))]),
-            }))))],
+                    )))]),
+                }),
+            )))))],
             "if ((a + b) % c()) {0} else {f()}",
         );
     }
