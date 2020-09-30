@@ -765,7 +765,6 @@ fn parse_function_arglist(t: &[Token]) -> IResult<Input, Vec<Declare>, ParseErro
         token(Token::Comma),
         tuple((
             token_type_of(Token::Identifier("".to_string())),
-            // function return type
             opt(tuple((
                 token(Token::Colon),
                 // type names
