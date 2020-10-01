@@ -12,7 +12,9 @@ fn generate_invoke_fn(invoke: &InvokeFn) -> String {
 }
 
 fn generate_if_body(list: &[Exp], nest: u64) -> String {
-    if list.len() > 1 {
+    if list.len() == 1 {
+        format!("{}", generate_exp(&list[0], nest))
+    } else {
         let mut s = String::new();
         s.push_str("\n");
 
@@ -25,10 +27,6 @@ fn generate_if_body(list: &[Exp], nest: u64) -> String {
             s.push_str("\n");
         }
         s
-    } else if list.len() == 1 {
-        format!("{}", generate_exp(&list[0], nest))
-    } else {
-        "".to_string()
     }
 }
 
